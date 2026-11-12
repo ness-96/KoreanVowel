@@ -183,6 +183,20 @@
     .mini-stat { padding: 11px 8px; border-radius: 10px; background: #f7f9fc; text-align: center; }
     .mini-stat strong { display: block; font-size: 17px; color: var(--navy); }
     .mini-stat span { color: #7b889b; font-size: 10px; }
+    .confirm-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(20, 29, 43, .48); }
+    .confirm-backdrop.hidden { display: none; }
+    .confirm-dialog { width: min(420px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(22, 35, 58, .28); }
+    .confirm-title { color: var(--navy); font-size: 17px; font-weight: 800; }
+    .confirm-description { margin-top: 8px; color: #65748a; font-size: 12px; line-height: 1.55; }
+    .confirm-label { display: block; margin-top: 16px; color: #65748a; font-size: 11px; font-weight: 700; }
+    .confirm-input { width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 10px; color: var(--ink); outline: none; font-size: 13px; }
+    .confirm-input:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
+    .confirm-message { margin-top: 8px; color: #9b6a30; font-size: 10px; }
+    .confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 17px; }
+    .confirm-actions button { margin-top: 0; }
+    .confirm-danger { color: #fff; border: 1px solid #c7464f; background: #c7464f; }
+    .confirm-danger:hover:not(:disabled) { background: #ae3942; }
+    .confirm-danger:disabled { cursor: not-allowed; opacity: .45; }
 
     .fullscreen-mode .topbar { position: fixed; left: 0; right: 0; }
     .fullscreen-mode .layout { max-width: none; padding-top: 104px; min-height: 100vh; }
@@ -381,6 +395,20 @@
     </main>
   </div>
 
+  <div class="confirm-backdrop hidden" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+    <div class="confirm-dialog">
+      <div class="confirm-title" id="deleteConfirmTitle">데이터를 정말 삭제하시겠습니까?</div>
+      <div class="confirm-description" id="deleteConfirmDescription"></div>
+      <label class="confirm-label" for="deleteConfirmInput">삭제하려면 아래에 <strong>삭제</strong>를 입력하세요.</label>
+      <input class="confirm-input" id="deleteConfirmInput" type="text" autocomplete="off" spellcheck="false" placeholder="삭제" />
+      <div class="confirm-message" id="deleteConfirmMessage">정확히 입력해야 삭제 버튼이 활성화됩니다.</div>
+      <div class="confirm-actions">
+        <button class="secondary-button" type="button" id="deleteCancelBtn">취소</button>
+        <button class="secondary-button confirm-danger" type="button" id="deleteConfirmBtn" disabled>삭제</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
@@ -399,6 +427,7 @@
     let micAnimationFrame = null;
     let micSpectrumFrames = [];
     let micLastSampleAt = 0;
+    let pendingDeletion = null;
 
     const svg = document.getElementById('chart');
     const plotContent = document.getElementById('plotContent');
@@ -673,6 +702,37 @@
       render();
     });
 
+    function closeDeleteConfirm() {
+      document.getElementById('deleteConfirmModal').classList.add('hidden');
+      document.getElementById('deleteConfirmInput').value = '';
+      document.getElementById('deleteConfirmBtn').disabled = true;
+      pendingDeletion = null;
+    }
+    function openDeleteConfirm(description, action) {
+      pendingDeletion = action;
+      document.getElementById('deleteConfirmDescription').textContent = description;
+      document.getElementById('deleteConfirmInput').value = '';
+      document.getElementById('deleteConfirmBtn').disabled = true;
+      document.getElementById('deleteConfirmModal').classList.remove('hidden');
+      document.getElementById('deleteConfirmInput').focus();
+    }
+    document.getElementById('deleteConfirmInput').addEventListener('input', e => {
+      document.getElementById('deleteConfirmBtn').disabled = e.target.value !== '삭제';
+    });
+    document.getElementById('deleteConfirmBtn').addEventListener('click', () => {
+      if (document.getElementById('deleteConfirmInput').value !== '삭제' || !pendingDeletion) return;
+      const action = pendingDeletion;
+      closeDeleteConfirm();
+      action();
+    });
+    document.getElementById('deleteCancelBtn').addEventListener('click', closeDeleteConfirm);
+    document.getElementById('deleteConfirmModal').addEventListener('click', e => {
+      if (e.target.id === 'deleteConfirmModal') closeDeleteConfirm();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !document.getElementById('deleteConfirmModal').classList.contains('hidden')) closeDeleteConfirm();
+    });
+
     document.getElementById('pointForm').addEventListener('submit', e => {
       e.preventDefault();
       const item = {
@@ -706,19 +766,36 @@
       formMessage.classList.add('visible', 'success');
       render();
     });
-    document.getElementById('resetBtn').addEventListener('click', () => { data = []; selectedSpeaker = 'all'; saveData(); render(); });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!data.length) return;
+      openDeleteConfirm('현재 저장된 모든 화자와 모음값을 삭제합니다.', () => {
+        data = [];
+        selectedSpeaker = 'all';
+        saveData();
+        render();
+      });
+    });
     document.getElementById('deleteSpeakerBtn').addEventListener('click', () => {
       const id = document.getElementById('deleteSpeakerSelect').value;
       if (!id) return;
-      data = data.filter(d => d.speakerId !== id);
-      if (selectedSpeaker === id) selectedSpeaker = 'all';
-      saveData(); render();
+      const count = data.filter(d => d.speakerId === id).length;
+      openDeleteConfirm(`${id} 화자의 모음값 ${count}개를 삭제합니다.`, () => {
+        data = data.filter(d => d.speakerId !== id);
+        if (selectedSpeaker === id) selectedSpeaker = 'all';
+        saveData();
+        render();
+      });
     });
     document.getElementById('deleteValueBtn').addEventListener('click', () => {
       const id = document.getElementById('deleteValueSelect').value;
       if (!id) return;
-      data = data.filter(d => d.id !== id);
-      saveData(); render();
+      const item = data.find(d => d.id === id);
+      if (!item) return;
+      openDeleteConfirm(`${item.speakerId} ID의 ${item.vowel} 값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, () => {
+        data = data.filter(d => d.id !== id);
+        saveData();
+        render();
+      });
     });
     document.getElementById('exportBtn').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
