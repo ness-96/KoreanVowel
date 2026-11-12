@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VowelSpace | F1·F2 모음 분포 프로토타입</title>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #718096;
+      --line: #e4e9f0;
+      --soft: #f6f8fb;
+      --card: #ffffff;
+      --navy: #1f3150;
+      --red: #ee5a62;
+      --red-soft: #fff0f1;
+      --blue: #4e7cf3;
+      --gray-point: #aeb7c4;
+      --shadow: 0 16px 45px rgba(26, 39, 61, .08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: #f3f6fa;
+      color: var(--ink);
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: -.01em;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app-shell { min-height: 100vh; }
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 34px;
+      background: rgba(255,255,255,.9);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      display: grid; place-items: center;
+      color: #fff; font-weight: 800; font-size: 17px;
+      background: linear-gradient(145deg, #273e66, #5d7de0);
+      box-shadow: 0 8px 18px rgba(55, 85, 150, .25);
+    }
+    .brand-name { font-size: 18px; font-weight: 800; letter-spacing: -.04em; }
+    .brand-sub { color: var(--muted); font-size: 12px; margin-left: 4px; }
+    .top-actions { display: flex; gap: 9px; }
+    .top-button {
+      border: 1px solid var(--line); background: #fff; color: #3b4a5f;
+      padding: 10px 13px; border-radius: 10px; font-weight: 700; font-size: 13px;
+      transition: .18s ease;
+    }
+    .top-button:hover { border-color: #b8c4d4; background: #f8fafc; }
+    .top-button.primary { color: #fff; background: var(--navy); border-color: var(--navy); }
+    .top-button.primary:hover { background: #2a4268; }
+
+    .layout {
+      max-width: 1480px; margin: 0 auto; padding: 28px 30px 42px;
+      display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 22px;
+    }
+    .visual-card, .panel {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .visual-card { min-width: 0; overflow: hidden; }
+    .card-head { padding: 24px 26px 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+    .eyebrow { color: #6c7d95; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+    h1, h2, h3, p { margin: 0; }
+    .card-title { margin-top: 7px; font-size: 23px; letter-spacing: -.05em; }
+    .card-description { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 680px; }
+    .metric-box { min-width: 126px; padding: 12px 14px; border-radius: 14px; background: #f7f9fc; text-align: right; }
+    .metric-label { color: var(--muted); font-size: 11px; }
+    .metric-value { margin-top: 3px; font-size: 22px; font-weight: 800; color: var(--navy); }
+
+    .chart-wrap {
+      position: relative; margin: 0 14px 0 10px; min-height: 610px;
+      background: linear-gradient(180deg, #fbfcfe, #f8fafc);
+      border-radius: 16px; overflow: hidden;
+    }
+    #chart { width: 100%; height: 610px; display: block; touch-action: none; user-select: none; }
+    .grid-line { stroke: #dfe6ef; stroke-width: 1; }
+    .grid-line.major { stroke: #cbd6e3; }
+    .axis-label { fill: #66758a; font-size: 12px; font-weight: 700; }
+    .tick-label { fill: #8290a3; font-size: 10px; }
+    .vowel-guide { fill: #c3cedb; font-size: 19px; font-weight: 800; opacity: .64; pointer-events: none; }
+    .point { stroke: rgba(255,255,255,.92); stroke-width: 1.3; cursor: crosshair; transition: opacity .18s, r .18s; }
+    .point:hover { stroke: #1c2430; stroke-width: 2.1; }
+    .point.female { fill: var(--red); }
+    .point.male { fill: #7e8998; }
+    .point.other { fill: #8a94a4; }
+    .point.selected-speaker { stroke: #243a62; stroke-width: 2.5; }
+    .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
+    .speaker-node { fill: #fff; stroke: #294a89; stroke-width: 2.2; }
+    .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
+    .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
+    .speaker-select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
+    .danger-button { color: #c7464f; border-color: #f0c4c7; background: #fff8f8; }
+    .danger-button:hover { color: #fff; border-color: #c7464f; background: #c7464f; }
+    .zoom-hint {
+      position: absolute; left: 20px; bottom: 17px; padding: 7px 10px;
+      border: 1px solid rgba(219,226,235,.95); border-radius: 9px;
+      color: #718096; background: rgba(255,255,255,.82); font-size: 11px;
+      pointer-events: none;
+    }
+    .tooltip {
+      position: absolute; z-index: 4; min-width: 190px; padding: 12px 13px;
+      border-radius: 12px; background: rgba(26,36,52,.96); color: #fff;
+      box-shadow: 0 12px 28px rgba(23,35,55,.22); pointer-events: none;
+      font-size: 12px; line-height: 1.55;
+    }
+    .tooltip.hidden { display: none; }
+    .tooltip-title { font-weight: 800; font-size: 13px; margin-bottom: 4px; }
+    .tooltip-row { display: flex; justify-content: space-between; gap: 16px; color: #dce4ef; }
+    .tooltip-row b { color: #fff; }
+    .legend { display: flex; align-items: center; gap: 18px; padding: 13px 26px 22px; color: #748195; font-size: 12px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .legend-dot.red { background: var(--red); }
+    .legend-dot.gray { background: var(--gray-point); }
+    .status-pill { margin-left: auto; color: #4e6a92; background: #edf4ff; padding: 6px 9px; border-radius: 8px; }
+
+    .sidebar { display: flex; flex-direction: column; gap: 14px; }
+    .panel { padding: 19px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+    .panel-title { font-size: 15px; font-weight: 800; letter-spacing: -.03em; }
+    .panel-caption { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .section-label { display: block; color: #708097; font-size: 11px; font-weight: 800; margin: 15px 0 8px; }
+    .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .segmented button, .age-button {
+      border: 1px solid var(--line); background: #fff; color: #65748a;
+      padding: 9px 5px; border-radius: 9px; font-size: 12px; font-weight: 700;
+      transition: .18s ease;
+    }
+    .segmented button:hover, .age-button:hover { border-color: #b8c6d8; }
+    .segmented button.active { color: #fff; background: var(--navy); border-color: var(--navy); }
+    .age-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .age-button.active { color: var(--navy); background: #eaf1ff; border-color: #a9c1f5; }
+    .filter-summary { margin-top: 14px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #65748a; font-size: 11px; line-height: 1.5; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { display: block; margin-bottom: 5px; color: #718096; font-size: 11px; font-weight: 700; }
+    .field input, .field select {
+      width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px;
+      color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px;
+    }
+    .field input:focus, .field select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
+    .submit-button {
+      width: 100%; margin-top: 12px; padding: 11px; border: 0; border-radius: 10px;
+      color: #fff; background: var(--red); font-weight: 800; font-size: 12px;
+    }
+    .submit-button:hover { background: #db4c55; }
+    .secondary-button {
+      width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px;
+      color: #5f6e83; background: #fff; font-weight: 700; font-size: 12px;
+    }
+    .secondary-button:hover { background: #f8fafc; }
+    .data-note { margin-top: 10px; color: #8995a6; font-size: 10px; line-height: 1.5; }
+    .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .mini-stat { padding: 11px 8px; border-radius: 10px; background: #f7f9fc; text-align: center; }
+    .mini-stat strong { display: block; font-size: 17px; color: var(--navy); }
+    .mini-stat span { color: #7b889b; font-size: 10px; }
+
+    .fullscreen-mode .topbar { position: fixed; left: 0; right: 0; }
+    .fullscreen-mode .layout { max-width: none; padding-top: 104px; min-height: 100vh; }
+    body.is-browser-fullscreen .layout { max-width: none; }
+    @media (max-width: 1050px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    }
+    @media (max-width: 700px) {
+      .topbar { padding: 0 16px; height: 68px; }
+      .brand-sub { display: none; }
+      .layout { padding: 16px 12px 28px; }
+      .sidebar { display: flex; }
+      .card-head { padding: 19px 18px 12px; }
+      .metric-box { display: none; }
+      .chart-wrap { margin: 0 6px; min-height: 500px; }
+      #chart { height: 500px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">V</div>
+        <div>
+          <div class="brand-name">VowelSpace <span class="brand-sub">F1·F2 distribution lab</span></div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="top-button" id="exportBtn">JSON 내보내기</button>
+        <button class="top-button primary" id="fullscreenBtn">전체 화면</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="visual-card">
+        <div class="card-head">
+          <div>
+            <div class="eyebrow">prototype / native vowel reference</div>
+            <h1 class="card-title">한국인 화자 F1·F2 모음 분포</h1>
+            <p class="card-description">점 위에 커서를 올리면 화자 정보가 표시됩니다. 오른쪽 패널에서 성별과 연령대를 선택하고, 휠로 공간을 확대·축소해 보세요.</p>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">현재 표시 점</div>
+            <div class="metric-value" id="pointCount">0</div>
+          </div>
+        </div>
+
+        <div class="chart-wrap" id="chartWrap">
+          <svg id="chart" viewBox="0 0 880 610" role="img" aria-label="F1 F2 모음 분포도">
+            <defs>
+              <clipPath id="plotClip"><rect x="78" y="32" width="748" height="520" rx="4" /></clipPath>
+            </defs>
+            <g id="fixedAxes">
+              <text class="axis-label" x="452" y="592" text-anchor="middle">F2 (Hz) · 앞쪽 ← / 뒤쪽 →</text>
+              <text class="axis-label" transform="translate(18 292) rotate(-90)" text-anchor="middle">F1 (Hz) · 높은 값 ↓</text>
+            </g>
+            <g id="plotViewport" clip-path="url(#plotClip)">
+              <g id="plotContent"></g>
+            </g>
+          </svg>
+          <div class="zoom-hint">휠: 확대·축소 · 드래그: 공간 이동</div>
+          <div class="tooltip hidden" id="tooltip"></div>
+        </div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot red"></span>여성</span>
+          <span class="legend-item"><span class="legend-dot gray"></span>남성·비선택 범주</span>
+          <span class="status-pill" id="dataStatus">데이터 없음</span>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">분포 필터</div>
+              <div class="panel-caption">성별과 연령대별로 표시 범위를 바꿉니다.</div>
+            </div>
+          </div>
+          <span class="section-label">성별</span>
+          <div class="segmented" id="genderFilter">
+            <button class="active" data-gender="all">전체</button>
+            <button data-gender="female">여성</button>
+            <button data-gender="male">남성</button>
+          </div>
+          <span class="section-label">연령대</span>
+          <div class="age-grid" id="ageFilter">
+            <button class="age-button active" data-age="all">전체</button>
+            <button class="age-button" data-age="10대">10대</button>
+            <button class="age-button" data-age="20대">20대</button>
+            <button class="age-button" data-age="30대">30대</button>
+            <button class="age-button" data-age="40대">40대</button>
+            <button class="age-button" data-age="50대">50대</button>
+            <button class="age-button" data-age="60대">60대</button>
+            <button class="age-button" data-age="70대">70대</button>
+          </div>
+          <div class="filter-summary" id="filterSummary">전체 성별 · 전체 연령대가 표시되고 있습니다.</div>
+          <span class="section-label">화자 모음 모양</span>
+          <select class="speaker-select" id="speakerShapeSelect">
+            <option value="all">화자 선택</option>
+          </select>
+          <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">모음 값 추가</div>
+              <div class="panel-caption">화자별 F1·F2 값을 하나씩 입력합니다.</div>
+            </div>
+          </div>
+          <form id="pointForm">
+            <div class="form-grid">
+              <div class="field"><label for="speakerId">화자 ID</label><input id="speakerId" required placeholder="예: K101" /></div>
+              <div class="field"><label for="region">지역</label><input id="region" required placeholder="예: 서울" /></div>
+              <div class="field"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
+              <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
+              <div class="field"><label for="age">연령대</label><select id="age" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
+              <div class="field"><label for="vowel">모음</label><select id="vowel" required><option>ㅣ</option><option>ㅔ</option><option>ㅐ</option><option>ㅏ</option><option>ㅓ</option><option>ㅡ</option><option>ㅗ</option><option>ㅜ</option></select></div>
+              <div class="field"><label for="f1">F1 (Hz)</label><input id="f1" type="number" min="100" max="1500" required placeholder="예: 430" /></div>
+              <div class="field"><label for="f2">F2 (Hz)</label><input id="f2" type="number" min="400" max="3500" required placeholder="예: 1900" /></div>
+            </div>
+            <button class="submit-button" type="submit">분포도에 값 추가</button>
+            <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
+            <div class="data-note">입력한 값은 이 브라우저에 저장됩니다. 실제 코퍼스 자료는 JSON 입력 기능으로 연결할 수 있습니다.</div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">데이터 삭제</div>
+              <div class="panel-caption">지정한 화자 전체 또는 특정 모음값을 삭제합니다.</div>
+            </div>
+          </div>
+          <div class="field full">
+            <label for="deleteSpeakerSelect">화자 전체 삭제</label>
+            <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
+          </div>
+          <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
+          <div class="field full" style="margin-top:12px;">
+            <label for="deleteValueSelect">특정 모음값 삭제</label>
+            <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
+          </div>
+          <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 값 삭제</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">현재 데이터 요약</div>
+              <div class="panel-caption">필터 적용 전 전체 데이터 기준</div>
+            </div>
+          </div>
+          <div class="mini-stats">
+            <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
+            <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
+            <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
+    const AGE_GROUPS = ['10대','20대','30대','40대','50대','60대','70대'];
+    const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
+    let data = loadData();
+    let selectedGender = 'all';
+    let selectedAge = 'all';
+    let selectedSpeaker = 'all';
+    let zoom = { scale: 1, tx: 0, ty: 0 };
+    let drag = null;
+
+    const svg = document.getElementById('chart');
+    const plotContent = document.getElementById('plotContent');
+    const chartWrap = document.getElementById('chartWrap');
+    const tooltip = document.getElementById('tooltip');
+    const plot = { x: 78, y: 32, w: 748, h: 520 };
+    const domain = { f2Min: 600, f2Max: 2800, f1Min: 150, f1Max: 950 };
+
+    function loadData() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (Array.isArray(saved) && saved.length) return saved;
+      } catch (e) {}
+      return [];
+    }
+    function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {} }
+    function xScale(f2) { return plot.x + ((domain.f2Max - f2) / (domain.f2Max - domain.f2Min)) * plot.w; }
+    function yScale(f1) { return plot.y + ((f1 - domain.f1Min) / (domain.f1Max - domain.f1Min)) * plot.h; }
+    function esc(s) { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+    function drawGrid() {
+      const f2Ticks = [600, 1000, 1400, 1800, 2200, 2600, 2800];
+      const f1Ticks = [150, 300, 450, 600, 750, 900];
+      const vowelHints = [
+        ['ㅣ', 280, 2500], ['ㅔ', 430, 2130], ['ㅐ', 520, 1880], ['ㅏ', 720, 1250],
+        ['ㅓ', 510, 1020], ['ㅡ', 400, 1500], ['ㅗ', 390, 900], ['ㅜ', 290, 800]
+      ];
+      let html = '';
+      f2Ticks.forEach((tick, i) => {
+        const x = xScale(tick);
+        html += `<line class="grid-line ${i === 0 || i === f2Ticks.length-1 ? 'major':''}" x1="${x}" y1="${plot.y}" x2="${x}" y2="${plot.y+plot.h}" />`;
+        html += `<text class="tick-label" x="${x}" y="${plot.y+plot.h+20}" text-anchor="middle">${tick}</text>`;
+      });
+      f1Ticks.forEach((tick, i) => {
+        const y = yScale(tick);
+        html += `<line class="grid-line ${i === 0 || i === f1Ticks.length-1 ? 'major':''}" x1="${plot.x}" y1="${y}" x2="${plot.x+plot.w}" y2="${y}" />`;
+        html += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick}</text>`;
+      });
+      vowelHints.forEach(([v, f1, f2]) => {
+        html += `<text class="vowel-guide" x="${xScale(f2)}" y="${yScale(f1)}" text-anchor="middle">${v}</text>`;
+      });
+      plotContent.innerHTML = `<g class="grid">${html}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
+    }
+
+    function filteredData() {
+      return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && (selectedAge === 'all' || d.age === selectedAge));
+    }
+    function refreshDataSelectors() {
+      const speakers = [...new Set(data.map(d => d.speakerId))].sort();
+      if (selectedSpeaker !== 'all' && !speakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
+      const shapeSelect = document.getElementById('speakerShapeSelect');
+      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+      shapeSelect.value = selectedSpeaker;
+      const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
+      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
+      const deleteValue = document.getElementById('deleteValueSelect');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(d.region)}</option>`).join('');
+    }
+    function drawSpeakerShape() {
+      const lineLayer = document.getElementById('speakerLineLayer');
+      const summary = document.getElementById('speakerShapeSummary');
+      if (!lineLayer) return;
+      if (selectedSpeaker === 'all') {
+        lineLayer.innerHTML = '';
+        summary.textContent = '화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.';
+        return;
+      }
+      const speakerData = data.filter(d => d.speakerId === selectedSpeaker).sort((a, b) => VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel));
+      if (speakerData.length < 2) {
+        lineLayer.innerHTML = '';
+        summary.textContent = `${selectedSpeaker}: 연결할 모음값이 2개 이상 필요합니다.`;
+        return;
+      }
+      const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
+      const nodes = speakerData.map(d => `<circle class="speaker-node" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="5" />`).join('');
+      lineLayer.innerHTML = `<polyline class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
+      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 연결해 표시하고 있습니다.`;
+    }
+    function pointOpacity(d) {
+      if (selectedGender === 'all') return 0.82;
+      return d.gender === selectedGender ? 0.94 : 0.16;
+    }
+    function pointColorClass(d) { return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other'; }
+
+    function render() {
+      refreshDataSelectors();
+      drawGrid();
+      const layer = document.getElementById('pointsLayer');
+      const visible = filteredData();
+      layer.innerHTML = data.map(d => {
+        const r = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 7.2 : 5.8;
+        const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
+        return `<circle class="point ${pointColorClass(d)}${selectedClass}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="${r}" opacity="${pointOpacity(d)}" data-id="${esc(d.id)}" />`;
+      }).join('');
+      layer.querySelectorAll('.point').forEach(circle => {
+        const d = data.find(item => item.id === circle.dataset.id);
+        circle.addEventListener('mouseenter', e => showTooltip(e, d));
+        circle.addEventListener('mousemove', e => moveTooltip(e));
+        circle.addEventListener('mouseleave', hideTooltip);
+      });
+      drawSpeakerShape();
+      applyZoom();
+      updateStats(visible.length);
+      updateSummary(visible.length);
+    }
+    function applyZoom() { plotContent.setAttribute('transform', `translate(${zoom.tx} ${zoom.ty}) scale(${zoom.scale})`); }
+    function showTooltip(e, d) {
+      tooltip.innerHTML = `<div class="tooltip-title">${esc(d.vowel)} · ${esc(d.speakerId)}</div><div class="tooltip-row"><span>성별</span><b>${d.gender === 'female' ? '여성' : '남성'}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div><div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
+      tooltip.classList.remove('hidden'); moveTooltip(e);
+    }
+    function moveTooltip(e) {
+      const rect = chartWrap.getBoundingClientRect();
+      const width = 200;
+      const left = Math.min(e.clientX - rect.left + 14, rect.width - width - 12);
+      const top = Math.max(12, e.clientY - rect.top - 16);
+      tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+    }
+    function hideTooltip() { tooltip.classList.add('hidden'); }
+    function updateStats(visibleCount) {
+      document.getElementById('pointCount').textContent = visibleCount;
+      document.getElementById('recordCount').textContent = data.length;
+      document.getElementById('speakerCount').textContent = new Set(data.map(d => d.speakerId)).size;
+      document.getElementById('vowelCount').textContent = new Set(data.map(d => d.vowel)).size;
+      document.getElementById('dataStatus').textContent = `${data.length}개 토큰 · ${new Set(data.map(d => d.speakerId)).size}명`;
+    }
+    function updateSummary(visibleCount) {
+      const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
+      const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
+      document.getElementById('filterSummary').textContent = `${gender} · ${age} · ${visibleCount}개 점이 표시되고 있습니다.`;
+    }
+
+    document.getElementById('genderFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      selectedGender = button.dataset.gender;
+      document.querySelectorAll('#genderFilter button').forEach(b => b.classList.toggle('active', b === button));
+      render();
+    });
+    document.getElementById('ageFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      selectedAge = button.dataset.age;
+      document.querySelectorAll('#ageFilter button').forEach(b => b.classList.toggle('active', b === button));
+      render();
+    });
+    document.getElementById('speakerShapeSelect').addEventListener('change', e => {
+      selectedSpeaker = e.target.value;
+      render();
+    });
+
+    document.getElementById('pointForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const item = {
+        id: `${document.getElementById('speakerId').value.trim()}-${document.getElementById('vowel').value}-${Date.now()}`,
+        speakerId: document.getElementById('speakerId').value.trim(),
+        region: document.getElementById('region').value.trim(),
+        nationality: document.getElementById('nationality').value.trim() || '미입력',
+        gender: document.getElementById('gender').value,
+        age: document.getElementById('age').value,
+        vowel: document.getElementById('vowel').value,
+        f1: Number(document.getElementById('f1').value),
+        f2: Number(document.getElementById('f2').value),
+        source: 'manual'
+      };
+      if (!item.speakerId || !item.region || !item.f1 || !item.f2) return;
+      data.push(item); saveData(); e.target.reset(); document.getElementById('gender').value = 'female'; document.getElementById('age').value = '20대'; render();
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => { data = []; selectedSpeaker = 'all'; saveData(); render(); });
+    document.getElementById('deleteSpeakerBtn').addEventListener('click', () => {
+      const id = document.getElementById('deleteSpeakerSelect').value;
+      if (!id) return;
+      data = data.filter(d => d.speakerId !== id);
+      if (selectedSpeaker === id) selectedSpeaker = 'all';
+      saveData(); render();
+    });
+    document.getElementById('deleteValueBtn').addEventListener('click', () => {
+      const id = document.getElementById('deleteValueSelect').value;
+      if (!id) return;
+      data = data.filter(d => d.id !== id);
+      saveData(); render();
+    });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'vowel-space-data.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('fullscreenBtn').addEventListener('click', async () => {
+      document.body.classList.toggle('fullscreen-mode');
+      try {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+        else await document.exitFullscreen();
+      } catch (e) {}
+    });
+    document.addEventListener('fullscreenchange', () => {
+      document.body.classList.toggle('is-browser-fullscreen', Boolean(document.fullscreenElement));
+      document.getElementById('fullscreenBtn').textContent = document.fullscreenElement ? '전체 화면 닫기' : '전체 화면';
+    });
+    svg.addEventListener('wheel', e => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      zoom.scale = Math.max(.75, Math.min(4, zoom.scale * factor));
+      applyZoom();
+    }, { passive: false });
+    svg.addEventListener('pointerdown', e => {
+      if (e.target.closest('.point')) return;
+      drag = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
+      svg.setPointerCapture(e.pointerId);
+      svg.style.cursor = 'grabbing';
+    });
+    svg.addEventListener('pointermove', e => {
+      if (!drag) return;
+      zoom.tx = drag.tx + e.clientX - drag.x; zoom.ty = drag.ty + e.clientY - drag.y; applyZoom();
+    });
+    svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
+    svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
+
+    render();
+  </script>
+</body>
+</html>
