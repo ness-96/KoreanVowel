@@ -169,6 +169,10 @@
     }
     .secondary-button:hover { background: #f8fafc; }
     .data-note { margin-top: 10px; color: #8995a6; font-size: 10px; line-height: 1.5; }
+    .form-message { display: none; margin-top: 10px; padding: 10px 11px; border-radius: 10px; font-size: 11px; line-height: 1.5; }
+    .form-message.visible { display: block; }
+    .form-message.error { color: #a34249; background: #fff3f3; border: 1px solid #f1c8cb; }
+    .form-message.success { color: #35624d; background: #f1faf5; border: 1px solid #c9ead7; }
     .mic-prompt { margin-top: 10px; padding: 12px; border-radius: 10px; background: #f4f7ff; color: #304b7a; font-size: 13px; font-weight: 700; line-height: 1.55; }
     .mic-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
     .mic-actions .submit-button, .mic-actions .secondary-button { margin-top: 0; }
@@ -320,7 +324,7 @@
           <div class="panel-head">
             <div>
               <div class="panel-title">모음 값 추가</div>
-              <div class="panel-caption">화자별 F1·F2 값을 하나씩 입력합니다.</div>
+              <div class="panel-caption">ID 하나당 ㅡ·ㅓ·ㅏ·ㅜ·ㅗ·ㅣ·ㅔ·ㅐ를 각각 한 번씩만 입력할 수 있습니다.</div>
             </div>
           </div>
           <form id="pointForm">
@@ -336,7 +340,8 @@
             </div>
             <button class="submit-button" type="submit">분포도에 값 추가</button>
             <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
-            <div class="data-note">입력한 값은 이 브라우저에 저장됩니다. 실제 코퍼스 자료는 JSON 입력 기능으로 연결할 수 있습니다.</div>
+            <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
+            <div class="data-note">같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.</div>
           </form>
         </section>
 
@@ -406,7 +411,8 @@
       const unique = new Map();
       records.forEach(item => {
         if (!item || !item.speakerId || !item.vowel) return;
-        unique.set(`${item.speakerId}::${item.vowel}`, item);
+        const key = `${item.speakerId}::${item.vowel}`;
+        if (!unique.has(key)) unique.set(key, item);
       });
       return [...unique.values()];
     }
@@ -681,11 +687,24 @@
         f2: Number(document.getElementById('f2').value),
         source: 'manual'
       };
+      const formMessage = document.getElementById('formMessage');
+      formMessage.textContent = '';
+      formMessage.className = 'form-message';
       if (!item.speakerId || !item.region || !item.f1 || !item.f2) return;
-      const existingIndex = data.findIndex(d => d.speakerId === item.speakerId && d.vowel === item.vowel);
-      if (existingIndex >= 0) data[existingIndex] = item;
-      else data.push(item);
-      saveData(); e.target.reset(); document.getElementById('gender').value = 'female'; document.getElementById('age').value = '20대'; render();
+      const hasDuplicate = data.some(d => d.speakerId === item.speakerId && d.vowel === item.vowel);
+      if (hasDuplicate) {
+        formMessage.textContent = `${item.speakerId} ID에는 이미 ${item.vowel} 값이 있습니다. 기존 값을 유지했으며, 같은 ID·모음은 다시 입력할 수 없습니다.`;
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
+      data.push(item);
+      saveData();
+      e.target.reset();
+      document.getElementById('gender').value = 'female';
+      document.getElementById('age').value = '20대';
+      formMessage.textContent = `${item.speakerId} ID의 ${item.vowel} 값이 추가되었습니다.`;
+      formMessage.classList.add('visible', 'success');
+      render();
     });
     document.getElementById('resetBtn').addEventListener('click', () => { data = []; selectedSpeaker = 'all'; saveData(); render(); });
     document.getElementById('deleteSpeakerBtn').addEventListener('click', () => {
