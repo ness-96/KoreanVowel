@@ -391,12 +391,12 @@
       f2Ticks.forEach((tick, i) => {
         const x = xScale(tick);
         html += `<line class="grid-line ${i === 0 || i === f2Ticks.length-1 ? 'major':''}" x1="${x}" y1="${plot.y}" x2="${x}" y2="${plot.y+plot.h}" />`;
-        html += `<text class="tick-label" x="${x}" y="${plot.y+plot.h+20}" text-anchor="middle">${tick}</text>`;
+        html += `<text class="tick-label" x="${x}" y="${plot.y+plot.h+20}" text-anchor="middle">${tick} Hz</text>`;
       });
       f1Ticks.forEach((tick, i) => {
         const y = yScale(tick);
         html += `<line class="grid-line ${i === 0 || i === f1Ticks.length-1 ? 'major':''}" x1="${plot.x}" y1="${y}" x2="${plot.x+plot.w}" y2="${y}" />`;
-        html += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick}</text>`;
+        html += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick} Hz</text>`;
       });
       vowelHints.forEach(([v, f1, f2]) => {
         html += `<text class="vowel-guide" x="${xScale(f2)}" y="${yScale(f1)}" text-anchor="middle">${v}</text>`;
