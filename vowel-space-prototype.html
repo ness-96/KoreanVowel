@@ -98,6 +98,14 @@
     .point.female { fill: var(--red); }
     .point.male { fill: #7e8998; }
     .point.other { fill: #8a94a4; }
+    .point.selected-speaker { stroke: #243a62; stroke-width: 2.5; }
+    .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
+    .speaker-node { fill: #fff; stroke: #294a89; stroke-width: 2.2; }
+    .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
+    .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
+    .speaker-select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
+    .danger-button { color: #c7464f; border-color: #f0c4c7; background: #fff8f8; }
+    .danger-button:hover { color: #fff; border-color: #c7464f; background: #c7464f; }
     .zoom-hint {
       position: absolute; left: 20px; bottom: 17px; padding: 7px 10px;
       border: 1px solid rgba(219,226,235,.95); border-radius: 9px;
@@ -207,7 +215,7 @@
           </div>
           <div class="metric-box">
             <div class="metric-label">현재 표시 점</div>
-            <div class="metric-value" id="pointCount">64</div>
+            <div class="metric-value" id="pointCount">0</div>
           </div>
         </div>
 
@@ -230,7 +238,7 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot gray"></span>남성·비선택 범주</span>
-          <span class="status-pill" id="dataStatus">예시 데이터 64개</span>
+          <span class="status-pill" id="dataStatus">데이터 없음</span>
         </div>
       </section>
 
@@ -260,6 +268,11 @@
             <button class="age-button" data-age="70대">70대</button>
           </div>
           <div class="filter-summary" id="filterSummary">전체 성별 · 전체 연령대가 표시되고 있습니다.</div>
+          <span class="section-label">화자 모음 모양</span>
+          <select class="speaker-select" id="speakerShapeSelect">
+            <option value="all">화자 선택</option>
+          </select>
+          <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
         </section>
 
         <section class="panel">
@@ -280,9 +293,28 @@
               <div class="field"><label for="f2">F2 (Hz)</label><input id="f2" type="number" min="400" max="3500" required placeholder="예: 1900" /></div>
             </div>
             <button class="submit-button" type="submit">분포도에 값 추가</button>
-            <button class="secondary-button" type="button" id="resetBtn">예시 데이터로 초기화</button>
-            <div class="data-note">현재 데이터는 화면 확인을 위한 예시입니다. 추가한 값은 이 브라우저에 저장됩니다.</div>
+            <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
+            <div class="data-note">입력한 값은 이 브라우저에 저장됩니다. 실제 코퍼스 자료는 JSON 입력 기능으로 연결할 수 있습니다.</div>
           </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">데이터 삭제</div>
+              <div class="panel-caption">지정한 화자 전체 또는 특정 모음값을 삭제합니다.</div>
+            </div>
+          </div>
+          <div class="field full">
+            <label for="deleteSpeakerSelect">화자 전체 삭제</label>
+            <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
+          </div>
+          <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
+          <div class="field full" style="margin-top:12px;">
+            <label for="deleteValueSelect">특정 모음값 삭제</label>
+            <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
+          </div>
+          <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 값 삭제</button>
         </section>
 
         <section class="panel">
@@ -293,9 +325,9 @@
             </div>
           </div>
           <div class="mini-stats">
-            <div class="mini-stat"><strong id="speakerCount">8</strong><span>화자</span></div>
-            <div class="mini-stat"><strong id="vowelCount">8</strong><span>모음</span></div>
-            <div class="mini-stat"><strong id="recordCount">64</strong><span>토큰</span></div>
+            <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
+            <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
+            <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
           </div>
         </section>
       </aside>
@@ -305,47 +337,11 @@
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
     const AGE_GROUPS = ['10대','20대','30대','40대','50대','60대','70대'];
-    const STORAGE_KEY = 'vowel-space-prototype-v1';
-    const base = {
-      'ㅣ': [310, 2380], 'ㅔ': [455, 2070], 'ㅐ': [535, 1840], 'ㅏ': [710, 1280],
-      'ㅓ': [505, 1060], 'ㅡ': [405, 1530], 'ㅗ': [405, 920], 'ㅜ': [300, 850]
-    };
-    const speakers = [
-      { id:'K001', gender:'female', age:'20대', region:'서울' },
-      { id:'K002', gender:'male', age:'20대', region:'부산' },
-      { id:'K003', gender:'female', age:'30대', region:'대전' },
-      { id:'K004', gender:'male', age:'30대', region:'광주' },
-      { id:'K005', gender:'female', age:'40대', region:'서울' },
-      { id:'K006', gender:'male', age:'50대', region:'대구' },
-      { id:'K007', gender:'female', age:'60대', region:'인천' },
-      { id:'K008', gender:'male', age:'70대', region:'제주' }
-    ];
-    const jitter = [
-      [ 12,-22],[-18, 30],[ 24, 14],[-12,-28],[ 16, 20],[-23,-10],[  8, 36],[-16,  4]
-    ];
-    function makeSampleData() {
-      const out = [];
-      speakers.forEach((speaker, si) => {
-        VOWELS.forEach((vowel, vi) => {
-          const [f1, f2] = base[vowel];
-          const [j1, j2] = jitter[(vi + si) % jitter.length];
-          const genderShift = speaker.gender === 'female' ? [55, 95] : [-25, -60];
-          out.push({
-            id: `${speaker.id}-${vowel}`,
-            speakerId: speaker.id, gender: speaker.gender, age: speaker.age,
-            region: speaker.region, vowel,
-            f1: Math.round(f1 + j1 + genderShift[0]),
-            f2: Math.round(f2 + j2 + genderShift[1]),
-            source: 'sample'
-          });
-        });
-      });
-      return out;
-    }
-
+    const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     let data = loadData();
     let selectedGender = 'all';
     let selectedAge = 'all';
+    let selectedSpeaker = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
 
@@ -361,7 +357,7 @@
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (Array.isArray(saved) && saved.length) return saved;
       } catch (e) {}
-      return makeSampleData();
+      return [];
     }
     function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {} }
     function xScale(f2) { return plot.x + ((domain.f2Max - f2) / (domain.f2Max - domain.f2Min)) * plot.w; }
@@ -389,11 +385,42 @@
       vowelHints.forEach(([v, f1, f2]) => {
         html += `<text class="vowel-guide" x="${xScale(f2)}" y="${yScale(f1)}" text-anchor="middle">${v}</text>`;
       });
-      plotContent.innerHTML = `<g class="grid">${html}</g><g id="pointsLayer"></g>`;
+      plotContent.innerHTML = `<g class="grid">${html}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
     }
 
     function filteredData() {
       return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && (selectedAge === 'all' || d.age === selectedAge));
+    }
+    function refreshDataSelectors() {
+      const speakers = [...new Set(data.map(d => d.speakerId))].sort();
+      if (selectedSpeaker !== 'all' && !speakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
+      const shapeSelect = document.getElementById('speakerShapeSelect');
+      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+      shapeSelect.value = selectedSpeaker;
+      const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
+      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
+      const deleteValue = document.getElementById('deleteValueSelect');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.region)}</option>`).join('');
+    }
+    function drawSpeakerShape() {
+      const lineLayer = document.getElementById('speakerLineLayer');
+      const summary = document.getElementById('speakerShapeSummary');
+      if (!lineLayer) return;
+      if (selectedSpeaker === 'all') {
+        lineLayer.innerHTML = '';
+        summary.textContent = '화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.';
+        return;
+      }
+      const speakerData = data.filter(d => d.speakerId === selectedSpeaker).sort((a, b) => VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel));
+      if (speakerData.length < 2) {
+        lineLayer.innerHTML = '';
+        summary.textContent = `${selectedSpeaker}: 연결할 모음값이 2개 이상 필요합니다.`;
+        return;
+      }
+      const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
+      const nodes = speakerData.map(d => `<circle class="speaker-node" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="5" />`).join('');
+      lineLayer.innerHTML = `<polyline class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
+      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 연결해 표시하고 있습니다.`;
     }
     function pointOpacity(d) {
       if (selectedGender === 'all') return 0.82;
@@ -402,12 +429,14 @@
     function pointColorClass(d) { return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other'; }
 
     function render() {
+      refreshDataSelectors();
       drawGrid();
       const layer = document.getElementById('pointsLayer');
       const visible = filteredData();
       layer.innerHTML = data.map(d => {
-        const r = d.source === 'sample' ? 5.1 : 6.7;
-        return `<circle class="point ${pointColorClass(d)}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="${r}" opacity="${pointOpacity(d)}" data-id="${esc(d.id)}" />`;
+        const r = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 7.2 : 5.8;
+        const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
+        return `<circle class="point ${pointColorClass(d)}${selectedClass}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="${r}" opacity="${pointOpacity(d)}" data-id="${esc(d.id)}" />`;
       }).join('');
       layer.querySelectorAll('.point').forEach(circle => {
         const d = data.find(item => item.id === circle.dataset.id);
@@ -415,6 +444,7 @@
         circle.addEventListener('mousemove', e => moveTooltip(e));
         circle.addEventListener('mouseleave', hideTooltip);
       });
+      drawSpeakerShape();
       applyZoom();
       updateStats(visible.length);
       updateSummary(visible.length);
@@ -457,6 +487,10 @@
       document.querySelectorAll('#ageFilter button').forEach(b => b.classList.toggle('active', b === button));
       render();
     });
+    document.getElementById('speakerShapeSelect').addEventListener('change', e => {
+      selectedSpeaker = e.target.value;
+      render();
+    });
 
     document.getElementById('pointForm').addEventListener('submit', e => {
       e.preventDefault();
@@ -474,7 +508,20 @@
       if (!item.speakerId || !item.region || !item.f1 || !item.f2) return;
       data.push(item); saveData(); e.target.reset(); document.getElementById('gender').value = 'female'; document.getElementById('age').value = '20대'; render();
     });
-    document.getElementById('resetBtn').addEventListener('click', () => { data = makeSampleData(); saveData(); render(); });
+    document.getElementById('resetBtn').addEventListener('click', () => { data = []; selectedSpeaker = 'all'; saveData(); render(); });
+    document.getElementById('deleteSpeakerBtn').addEventListener('click', () => {
+      const id = document.getElementById('deleteSpeakerSelect').value;
+      if (!id) return;
+      data = data.filter(d => d.speakerId !== id);
+      if (selectedSpeaker === id) selectedSpeaker = 'all';
+      saveData(); render();
+    });
+    document.getElementById('deleteValueBtn').addEventListener('click', () => {
+      const id = document.getElementById('deleteValueSelect').value;
+      if (!id) return;
+      data = data.filter(d => d.id !== id);
+      saveData(); render();
+    });
     document.getElementById('exportBtn').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'vowel-space-data.json'; a.click(); URL.revokeObjectURL(url);
