@@ -286,6 +286,7 @@
             <div class="form-grid">
               <div class="field"><label for="speakerId">화자 ID</label><input id="speakerId" required placeholder="예: K101" /></div>
               <div class="field"><label for="region">지역</label><input id="region" required placeholder="예: 서울" /></div>
+              <div class="field"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
               <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
               <div class="field"><label for="age">연령대</label><select id="age" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
               <div class="field"><label for="vowel">모음</label><select id="vowel" required><option>ㅣ</option><option>ㅔ</option><option>ㅐ</option><option>ㅏ</option><option>ㅓ</option><option>ㅡ</option><option>ㅗ</option><option>ㅜ</option></select></div>
@@ -400,7 +401,7 @@
       const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
       deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
       const deleteValue = document.getElementById('deleteValueSelect');
-      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.region)}</option>`).join('');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(d.region)}</option>`).join('');
     }
     function drawSpeakerShape() {
       const lineLayer = document.getElementById('speakerLineLayer');
@@ -451,7 +452,7 @@
     }
     function applyZoom() { plotContent.setAttribute('transform', `translate(${zoom.tx} ${zoom.ty}) scale(${zoom.scale})`); }
     function showTooltip(e, d) {
-      tooltip.innerHTML = `<div class="tooltip-title">${esc(d.vowel)} · ${esc(d.speakerId)}</div><div class="tooltip-row"><span>성별</span><b>${d.gender === 'female' ? '여성' : '남성'}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div><div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
+      tooltip.innerHTML = `<div class="tooltip-title">${esc(d.vowel)} · ${esc(d.speakerId)}</div><div class="tooltip-row"><span>성별</span><b>${d.gender === 'female' ? '여성' : '남성'}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div><div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
       tooltip.classList.remove('hidden'); moveTooltip(e);
     }
     function moveTooltip(e) {
@@ -498,6 +499,7 @@
         id: `${document.getElementById('speakerId').value.trim()}-${document.getElementById('vowel').value}-${Date.now()}`,
         speakerId: document.getElementById('speakerId').value.trim(),
         region: document.getElementById('region').value.trim(),
+        nationality: document.getElementById('nationality').value.trim() || '미입력',
         gender: document.getElementById('gender').value,
         age: document.getElementById('age').value,
         vowel: document.getElementById('vowel').value,
