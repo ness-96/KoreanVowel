@@ -353,14 +353,29 @@
     const plot = { x: 78, y: 32, w: 748, h: 520 };
     const domain = { f2Min: 600, f2Max: 2800, f1Min: 150, f1Max: 950 };
 
+    function normalizeData(records) {
+      const unique = new Map();
+      records.forEach(item => {
+        if (!item || !item.speakerId || !item.vowel) return;
+        unique.set(`${item.speakerId}::${item.vowel}`, item);
+      });
+      return [...unique.values()];
+    }
     function loadData() {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (Array.isArray(saved) && saved.length) return saved;
+        if (Array.isArray(saved)) {
+          const normalized = normalizeData(saved);
+          if (normalized.length !== saved.length) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          return normalized;
+        }
       } catch (e) {}
       return [];
     }
-    function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {} }
+    function saveData() {
+      data = normalizeData(data);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+    }
     function xScale(f2) { return plot.x + ((domain.f2Max - f2) / (domain.f2Max - domain.f2Min)) * plot.w; }
     function yScale(f1) { return plot.y + ((f1 - domain.f1Min) / (domain.f1Max - domain.f1Min)) * plot.h; }
     function esc(s) { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -393,13 +408,14 @@
       return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && (selectedAge === 'all' || d.age === selectedAge));
     }
     function refreshDataSelectors() {
-      const speakers = [...new Set(data.map(d => d.speakerId))].sort();
-      if (selectedSpeaker !== 'all' && !speakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
+      const allSpeakers = [...new Set(data.map(d => d.speakerId))].sort();
+      const visibleSpeakers = [...new Set(filteredData().map(d => d.speakerId))].sort();
+      if (selectedSpeaker !== 'all' && !visibleSpeakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
       const shapeSelect = document.getElementById('speakerShapeSelect');
-      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + visibleSpeakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
       shapeSelect.value = selectedSpeaker;
       const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
-      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + speakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
+      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
       const deleteValue = document.getElementById('deleteValueSelect');
       deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(d.region)}</option>`).join('');
     }
@@ -412,7 +428,7 @@
         summary.textContent = '화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.';
         return;
       }
-      const speakerData = data.filter(d => d.speakerId === selectedSpeaker).sort((a, b) => VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel));
+      const speakerData = filteredData().filter(d => d.speakerId === selectedSpeaker).sort((a, b) => VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel));
       if (speakerData.length < 2) {
         lineLayer.innerHTML = '';
         summary.textContent = `${selectedSpeaker}: 연결할 모음값이 2개 이상 필요합니다.`;
@@ -508,7 +524,10 @@
         source: 'manual'
       };
       if (!item.speakerId || !item.region || !item.f1 || !item.f2) return;
-      data.push(item); saveData(); e.target.reset(); document.getElementById('gender').value = 'female'; document.getElementById('age').value = '20대'; render();
+      const existingIndex = data.findIndex(d => d.speakerId === item.speakerId && d.vowel === item.vowel);
+      if (existingIndex >= 0) data[existingIndex] = item;
+      else data.push(item);
+      saveData(); e.target.reset(); document.getElementById('gender').value = 'female'; document.getElementById('age').value = '20대'; render();
     });
     document.getElementById('resetBtn').addEventListener('click', () => { data = []; selectedSpeaker = 'all'; saveData(); render(); });
     document.getElementById('deleteSpeakerBtn').addEventListener('click', () => {
