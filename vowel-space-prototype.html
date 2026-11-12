@@ -102,6 +102,8 @@
     .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
     .speaker-node { fill: #fff; stroke: #294a89; stroke-width: 2.2; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
+    .point.mic-point { fill: #4e7cf3; stroke: #fff; stroke-width: 2.5; }
+    .mic-label { fill: #315fc4; font-size: 11px; font-weight: 800; pointer-events: none; }
     .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
     .speaker-select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
     .danger-button { color: #c7464f; border-color: #f0c4c7; background: #fff8f8; }
@@ -127,6 +129,7 @@
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     .legend-dot.red { background: var(--red); }
     .legend-dot.gray { background: var(--gray-point); }
+    .legend-dot.blue { background: #4e7cf3; }
     .status-pill { margin-left: auto; color: #4e6a92; background: #edf4ff; padding: 6px 9px; border-radius: 8px; }
 
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
@@ -166,6 +169,12 @@
     }
     .secondary-button:hover { background: #f8fafc; }
     .data-note { margin-top: 10px; color: #8995a6; font-size: 10px; line-height: 1.5; }
+    .mic-prompt { margin-top: 10px; padding: 12px; border-radius: 10px; background: #f4f7ff; color: #304b7a; font-size: 13px; font-weight: 700; line-height: 1.55; }
+    .mic-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+    .mic-actions .submit-button, .mic-actions .secondary-button { margin-top: 0; }
+    .mic-status { margin-top: 10px; color: #60718a; font-size: 11px; line-height: 1.5; }
+    .mic-result { margin-top: 8px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #53657e; font-size: 11px; line-height: 1.55; }
+    .mic-result strong { color: #315fc4; }
     .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
     .mini-stat { padding: 11px 8px; border-radius: 10px; background: #f7f9fc; text-align: center; }
     .mini-stat strong { display: block; font-size: 17px; color: var(--navy); }
@@ -239,6 +248,7 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot gray"></span>남성·비선택 범주</span>
+          <span class="legend-item"><span class="legend-dot blue"></span>내 발음(예비 분석)</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
         </div>
       </section>
@@ -274,6 +284,36 @@
             <option value="all">화자 선택</option>
           </select>
           <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
+        </section>
+
+        <section class="panel mic-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">마이크 발음 분석</div>
+              <div class="panel-caption">표적 모음이 들어간 문장을 읽으면 내 발음의 위치를 분포도에 겹쳐 봅니다.</div>
+            </div>
+          </div>
+          <div class="field full">
+            <label for="micVowel">분석할 표적 모음</label>
+            <select id="micVowel">
+              <option value="ㅣ">ㅣ (이)</option>
+              <option value="ㅔ">ㅔ (에)</option>
+              <option value="ㅐ">ㅐ (애)</option>
+              <option value="ㅏ">ㅏ (아)</option>
+              <option value="ㅓ">ㅓ (어)</option>
+              <option value="ㅡ">ㅡ (으)</option>
+              <option value="ㅗ">ㅗ (오)</option>
+              <option value="ㅜ">ㅜ (우)</option>
+            </select>
+          </div>
+          <div class="mic-prompt" id="micPrompt">제가 방금 이 소리를 연습했습니다.</div>
+          <div class="mic-actions">
+            <button class="submit-button" type="button" id="micStartBtn">마이크로 읽기</button>
+            <button class="secondary-button" type="button" id="micStopBtn" disabled>녹음 중지</button>
+          </div>
+          <div class="mic-status" id="micStatus">마이크 권한을 허용한 뒤 문장을 읽어 주세요.</div>
+          <div class="mic-result" id="micResult">분석 결과가 그래프에 파란 점으로 표시됩니다.</div>
+          <div class="data-note">HTTPS 환경과 마이크 권한이 필요합니다. 브라우저에서 계산하는 간이 F1·F2 예비 추정값이므로 연구용 측정값을 대신하지 않습니다.</div>
         </section>
 
         <section class="panel">
@@ -338,6 +378,7 @@
 
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
+    const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
     const AGE_GROUPS = ['10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     let data = loadData();
@@ -346,6 +387,13 @@
     let selectedSpeaker = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
+    let micPoint = null;
+    let micStream = null;
+    let micAudioContext = null;
+    let micAnalyser = null;
+    let micAnimationFrame = null;
+    let micSpectrumFrames = [];
+    let micLastSampleAt = 0;
 
     const svg = document.getElementById('chart');
     const plotContent = document.getElementById('plotContent');
@@ -443,23 +491,30 @@
       summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 연결해 표시하고 있습니다.`;
     }
     function pointOpacity(d) {
+      if (d.source === 'microphone') return 1;
       if (selectedGender === 'all') return 0.82;
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
-    function pointColorClass(d) { return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other'; }
+    function pointColorClass(d) {
+      if (d.source === 'microphone') return 'mic-point';
+      return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
+    }
 
     function render() {
       refreshDataSelectors();
       drawGrid();
       const layer = document.getElementById('pointsLayer');
       const visible = filteredData();
-      layer.innerHTML = data.map(d => {
+      const corpusPoints = data.map(d => {
         const r = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 7.2 : 5.8;
         const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
         return `<circle class="point ${pointColorClass(d)}${selectedClass}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="${r}" opacity="${pointOpacity(d)}" data-id="${esc(d.id)}" />`;
       }).join('');
+      const micMarkup = micPoint ? `<circle class="point ${pointColorClass(micPoint)}" cx="${xScale(micPoint.f2)}" cy="${yScale(micPoint.f1)}" r="8" opacity="1" data-id="${esc(micPoint.id)}" /><text class="mic-label" x="${xScale(micPoint.f2)+11}" y="${yScale(micPoint.f1)-11}">내 발음</text>` : '';
+      layer.innerHTML = corpusPoints + micMarkup;
       layer.querySelectorAll('.point').forEach(circle => {
-        const d = data.find(item => item.id === circle.dataset.id);
+        const d = micPoint && circle.dataset.id === micPoint.id ? micPoint : data.find(item => item.id === circle.dataset.id);
+        if (!d) return;
         circle.addEventListener('mouseenter', e => showTooltip(e, d));
         circle.addEventListener('mousemove', e => moveTooltip(e));
         circle.addEventListener('mouseleave', hideTooltip);
@@ -471,7 +526,12 @@
     }
     function applyZoom() { plotContent.setAttribute('transform', `translate(${zoom.tx} ${zoom.ty}) scale(${zoom.scale})`); }
     function showTooltip(e, d) {
-      tooltip.innerHTML = `<div class="tooltip-title">${esc(d.vowel)} · ${esc(d.speakerId)}</div><div class="tooltip-row"><span>성별</span><b>${d.gender === 'female' ? '여성' : '남성'}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div><div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
+      if (!d) return;
+      const isMic = d.source === 'microphone';
+      const details = isMic
+        ? `<div class="tooltip-row"><span>자료</span><b>마이크 예비 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
+        : `<div class="tooltip-row"><span>성별</span><b>${d.gender === 'female' ? '여성' : '남성'}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div>`;
+      tooltip.innerHTML = `<div class="tooltip-title">${esc(d.vowel)} · ${esc(d.speakerId)}</div>${details}<div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
       tooltip.classList.remove('hidden'); moveTooltip(e);
     }
     function moveTooltip(e) {
@@ -492,9 +552,104 @@
     function updateSummary(visibleCount) {
       const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
       const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age} · ${visibleCount}개 점이 표시되고 있습니다.`;
+      document.getElementById('filterSummary').textContent = `${gender} · ${age} · ${visibleCount}개 점이 표시되고 있습니다.${micPoint ? ' 파란 점은 내 발음 예비 분석입니다.' : ''}`;
     }
 
+    function updateMicPrompt() {
+      const vowel = document.getElementById('micVowel').value;
+      document.getElementById('micPrompt').textContent = `제가 방금 ${VOWEL_SYLLABLES[vowel]} 소리를 연습했습니다.`;
+    }
+
+    function estimateMicFormants(frames, sampleRate, fftSize) {
+      if (frames.length < 3) return null;
+      const binCount = frames[0].length;
+      const average = new Float32Array(binCount);
+      frames.forEach(frame => frame.forEach((value, index) => { average[index] += value; }));
+      const peakInRange = (minHz, maxHz) => {
+        const start = Math.max(1, Math.floor(minHz * fftSize / sampleRate));
+        const end = Math.min(binCount - 1, Math.ceil(maxHz * fftSize / sampleRate));
+        let bestIndex = -1; let bestValue = -Infinity;
+        for (let index = start; index <= end; index += 1) {
+          if (average[index] > bestValue) { bestValue = average[index]; bestIndex = index; }
+        }
+        return bestIndex < 0 ? null : Math.round(bestIndex * sampleRate / fftSize);
+      };
+      const f1 = peakInRange(250, 1000);
+      const f2 = peakInRange(700, 3000);
+      return f1 && f2 ? { f1, f2 } : null;
+    }
+
+    function monitorMic(timestamp) {
+      if (!micAnalyser) return;
+      if (timestamp - micLastSampleAt >= 100) {
+        const frame = new Float32Array(micAnalyser.frequencyBinCount);
+        micAnalyser.getFloatFrequencyData(frame);
+        let peak = -Infinity;
+        frame.forEach(value => { if (value > peak) peak = value; });
+        if (peak > -78) micSpectrumFrames.push(frame);
+        micLastSampleAt = timestamp;
+      }
+      micAnimationFrame = requestAnimationFrame(monitorMic);
+    }
+
+    async function startMicRecording() {
+      if (micStream) return;
+      const status = document.getElementById('micStatus');
+      const startButton = document.getElementById('micStartBtn');
+      const stopButton = document.getElementById('micStopBtn');
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = '이 브라우저에서는 마이크 접근을 사용할 수 없습니다. HTTPS 주소에서 다시 시도해 주세요.';
+        return;
+      }
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error('AudioContext unavailable');
+        micAudioContext = new AudioContextClass();
+        if (micAudioContext.state === 'suspended') await micAudioContext.resume();
+        const source = micAudioContext.createMediaStreamSource(micStream);
+        micAnalyser = micAudioContext.createAnalyser();
+        micAnalyser.fftSize = 2048;
+        source.connect(micAnalyser);
+        const silentOutput = micAudioContext.createGain();
+        silentOutput.gain.value = 0;
+        micAnalyser.connect(silentOutput).connect(micAudioContext.destination);
+        micSpectrumFrames = [];
+        micLastSampleAt = 0;
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        status.textContent = '녹음 중입니다. 문장을 자연스럽게 읽은 뒤 녹음 중지를 눌러 주세요.';
+        micAnimationFrame = requestAnimationFrame(monitorMic);
+      } catch (error) {
+        if (micStream) micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+        status.textContent = '마이크 권한을 얻지 못했습니다. 브라우저의 마이크 권한을 확인해 주세요.';
+      }
+    }
+
+    function stopMicRecording() {
+      if (!micStream) return;
+      if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
+      const estimate = micAudioContext ? estimateMicFormants(micSpectrumFrames, micAudioContext.sampleRate, micAnalyser.fftSize) : null;
+      micStream.getTracks().forEach(track => track.stop());
+      if (micAudioContext) micAudioContext.close();
+      micStream = null; micAnalyser = null; micAudioContext = null; micAnimationFrame = null;
+      document.getElementById('micStartBtn').disabled = false;
+      document.getElementById('micStopBtn').disabled = true;
+      if (!estimate) {
+        document.getElementById('micStatus').textContent = '음성이 충분히 감지되지 않았습니다. 조금 더 크게 읽고 다시 시도해 주세요.';
+        return;
+      }
+      const vowel = document.getElementById('micVowel').value;
+      micPoint = { id: `mic-${Date.now()}`, speakerId: '내 발음', region: '브라우저 마이크', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
+      document.getElementById('micStatus').textContent = '분석이 완료되었습니다. 그래프의 파란 점을 확인해 주세요.';
+      document.getElementById('micResult').innerHTML = `<strong>${esc(vowel)} 예비 분석</strong><br>F1 ${estimate.f1} Hz · F2 ${estimate.f2} Hz`;
+      render();
+    }
+
+    document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
+    document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
+    document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedGender = button.dataset.gender;
@@ -580,6 +735,7 @@
     svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
 
+    updateMicPrompt();
     render();
   </script>
 </body>
