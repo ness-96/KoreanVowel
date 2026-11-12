@@ -228,6 +228,7 @@
               <text class="axis-label" x="452" y="592" text-anchor="middle">F2 (Hz) · 앞쪽 ← / 뒤쪽 →</text>
               <text class="axis-label" transform="translate(18 292) rotate(-90)" text-anchor="middle">F1 (Hz) · 높은 값 ↓</text>
             </g>
+            <g id="axisTicks"></g>
             <g id="plotViewport" clip-path="url(#plotClip)">
               <g id="plotContent"></g>
             </g>
@@ -387,21 +388,23 @@
         ['ㅣ', 280, 2500], ['ㅔ', 430, 2130], ['ㅐ', 520, 1880], ['ㅏ', 720, 1250],
         ['ㅓ', 510, 1020], ['ㅡ', 400, 1500], ['ㅗ', 390, 900], ['ㅜ', 290, 800]
       ];
-      let html = '';
+      let gridHtml = '';
+      let axisHtml = '';
       f2Ticks.forEach((tick, i) => {
         const x = xScale(tick);
-        html += `<line class="grid-line ${i === 0 || i === f2Ticks.length-1 ? 'major':''}" x1="${x}" y1="${plot.y}" x2="${x}" y2="${plot.y+plot.h}" />`;
-        html += `<text class="tick-label" x="${x}" y="${plot.y+plot.h+20}" text-anchor="middle">${tick} Hz</text>`;
+        gridHtml += `<line class="grid-line ${i === 0 || i === f2Ticks.length-1 ? 'major':''}" x1="${x}" y1="${plot.y}" x2="${x}" y2="${plot.y+plot.h}" />`;
+        axisHtml += `<text class="tick-label" x="${x}" y="${plot.y+plot.h+20}" text-anchor="middle">${tick} Hz</text>`;
       });
       f1Ticks.forEach((tick, i) => {
         const y = yScale(tick);
-        html += `<line class="grid-line ${i === 0 || i === f1Ticks.length-1 ? 'major':''}" x1="${plot.x}" y1="${y}" x2="${plot.x+plot.w}" y2="${y}" />`;
-        html += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick} Hz</text>`;
+        gridHtml += `<line class="grid-line ${i === 0 || i === f1Ticks.length-1 ? 'major':''}" x1="${plot.x}" y1="${y}" x2="${plot.x+plot.w}" y2="${y}" />`;
+        axisHtml += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick} Hz</text>`;
       });
       vowelHints.forEach(([v, f1, f2]) => {
-        html += `<text class="vowel-guide" x="${xScale(f2)}" y="${yScale(f1)}" text-anchor="middle">${v}</text>`;
+        gridHtml += `<text class="vowel-guide" x="${xScale(f2)}" y="${yScale(f1)}" text-anchor="middle">${v}</text>`;
       });
-      plotContent.innerHTML = `<g class="grid">${html}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
+      document.getElementById('axisTicks').innerHTML = axisHtml;
+      plotContent.innerHTML = `<g class="grid">${gridHtml}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
     }
 
     function filteredData() {
