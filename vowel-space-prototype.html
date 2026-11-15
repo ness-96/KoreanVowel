@@ -97,6 +97,7 @@
     .point.female { fill: var(--red); }
     .point.male { fill: #4e7cf3; }
     .point.other { fill: #8a94a4; }
+    .point.muted-point { fill: var(--gray-point); }
     .point.selected-speaker { stroke: #243a62; stroke-width: 1.6px; }
     .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
     .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 1px; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
@@ -472,6 +473,7 @@
     let selectedGender = 'all';
     let selectedAge = 'all';
     let selectedSpeaker = 'all';
+    let selectedVowel = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
     let micPoint = null;
@@ -691,11 +693,13 @@
       summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
     }
     function pointOpacity(d) {
+      if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
       if (d.source === 'microphone') return 1;
       if (selectedGender === 'all') return 0.82;
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
     function pointColorClass(d) {
+      if (selectedVowel !== 'all' && d.vowel !== selectedVowel) return 'muted-point';
       if (d.source === 'microphone') return 'mic-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
     }
@@ -780,8 +784,13 @@
         point.addEventListener('mousemove', e => moveTooltip(e));
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
-          if (point.dataset.average || d.source === 'microphone' || !d.speakerId) return;
-          selectedSpeaker = d.speakerId;
+          if (!d.vowel) return;
+          selectedVowel = selectedVowel === d.vowel ? 'all' : d.vowel;
+          selectedSpeaker = 'all';
+          selectedGender = 'all';
+          selectedAge = 'all';
+          document.querySelectorAll('#genderFilter button').forEach(button => button.classList.toggle('active', button.dataset.gender === selectedGender));
+          document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === selectedAge));
           render();
         });
       });
@@ -831,7 +840,8 @@
     function updateSummary(visibleCount, visibleAverageCount) {
       const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
       const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age} · ${visibleCount}개 화자값 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음 예비 분석입니다.' : ''}`;
+      const vowelFocus = selectedVowel === 'all' ? '' : ` · ${selectedVowel} 모음 강조` ;
+      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 화자값 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음 예비 분석입니다.' : ''}`;
     }
 
     function updateMicPrompt() {
