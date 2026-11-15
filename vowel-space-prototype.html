@@ -100,6 +100,8 @@
     .point.muted-point { fill: var(--gray-point); }
     .point.selected-speaker { stroke: #243a62; stroke-width: 1.6px; }
     .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
+    .speaker-path.male-shape { stroke: #4e7cf3; }
+    .speaker-path.female-shape { stroke: var(--red); }
     .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 1px; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
     .point.mic-point { fill: #315fc4; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
@@ -648,11 +650,22 @@
       plotContent.innerHTML = `<g class="grid">${gridHtml}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
     }
 
+    function hasExplicitMaleAverage() {
+      return averageData.some(d => (d.age === '평균' || d.age === 'average') && d.gender === 'male');
+    }
+    function isLegacyAverageSpeaker(d) {
+      return d && d.speakerId === '남성 평균' && !hasExplicitMaleAverage();
+    }
+    function matchesSelectedAge(d) {
+      if (selectedAge === 'all') return true;
+      if (selectedAge === 'average') return d.age === '평균' || d.age === 'average' || isLegacyAverageSpeaker(d);
+      return d.age === selectedAge;
+    }
     function filteredData() {
-      return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && (selectedAge === 'all' || d.age === selectedAge));
+      return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function filteredAverageData() {
-      return averageData.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && (selectedAge === 'all' || d.age === selectedAge));
+      return averageData.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function refreshDataSelectors() {
       const allSpeakers = [...new Set(data.map(d => d.speakerId))].sort();
@@ -704,17 +717,20 @@
       const closesTriangle = shapeData.some(d => d.vowel === 'ㅣ') && shapeData.some(d => d.vowel === 'ㅡ');
       const shapeTag = closesTriangle ? 'polygon' : 'polyline';
       const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
-      lineLayer.innerHTML = `<${shapeTag} class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(shapeData[0].f2)+10}" y="${yScale(shapeData[0].f1)-10}">${esc(shapeLabel)}</text>`;
+      const shapeColorClass = shapeData[0].gender === 'female' ? ' female-shape' : shapeData[0].gender === 'male' ? ' male-shape' : '';
+      lineLayer.innerHTML = `<${shapeTag} class="speaker-path${shapeColorClass}" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(shapeData[0].f2)+10}" y="${yScale(shapeData[0].f1)-10}">${esc(shapeLabel)}</text>`;
       summary.textContent = `${shapeLabel}: ${shapeData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
     }
     function pointOpacity(d) {
       if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
       if (d.source === 'microphone') return 1;
+      if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 0.16;
       if (selectedGender === 'all') return 0.82;
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
     function pointColorClass(d) {
       if (selectedVowel !== 'all' && d.vowel !== selectedVowel) return 'muted-point';
+      if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
       if (d.source === 'microphone') return 'mic-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
     }
