@@ -411,7 +411,7 @@
 
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
-    const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ'];
+    const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ','ㅡ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
     const VOWEL_CARRIER_SENTENCES = {
       'ㅣ': '나는 “이다”라고 말합니다.',
@@ -615,11 +615,11 @@
       }
       const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
       const nodes = speakerData.map(d => `<circle class="speaker-node" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="5" />`).join('');
-      const closesTriangle = speakerData.some(d => d.vowel === 'ㅣ') && speakerData.some(d => d.vowel === 'ㅜ');
+      const closesTriangle = speakerData.some(d => d.vowel === 'ㅣ') && speakerData.some(d => d.vowel === 'ㅡ');
       const shapeTag = closesTriangle ? 'polygon' : 'polyline';
-      const closeNotice = closesTriangle ? ' ㅣ-ㅜ 선으로 닫힌 모음 삼각도입니다.' : ' ㅜ 입력 전에는 열린 순서선으로 표시합니다.';
+      const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
       lineLayer.innerHTML = `<${shapeTag} class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
-      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ 순서로 연결합니다.${closeNotice}`;
+      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
     }
     function pointOpacity(d) {
       if (d.source === 'microphone') return 1;
