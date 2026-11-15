@@ -260,7 +260,7 @@
               <g id="plotContent"></g>
             </g>
           </svg>
-          <div class="zoom-hint">휠: 확대·축소 · 드래그: 공간 이동</div>
+          <div class="zoom-hint">휠: 확대·축소 · 드래그: 공간 이동 · <span id="zoomStatus">현재 100% · 제한 100~400%</span></div>
           <div class="tooltip hidden" id="tooltip"></div>
         </div>
         <div class="legend">
@@ -453,6 +453,9 @@
     const tooltip = document.getElementById('tooltip');
     const plot = { x: 78, y: 32, w: 748, h: 520 };
     const domain = { f2Min: 600, f2Max: 2800, f1Min: 150, f1Max: 950 };
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 4;
+    let viewDomain = { ...domain };
 
     function normalizeData(records) {
       const unique = new Map();
@@ -478,13 +481,82 @@
       data = normalizeData(data);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
     }
-    function xScale(f2) { return plot.x + ((domain.f2Max - f2) / (domain.f2Max - domain.f2Min)) * plot.w; }
-    function yScale(f1) { return plot.y + ((f1 - domain.f1Min) / (domain.f1Max - domain.f1Min)) * plot.h; }
+    function xScale(f2) { return plot.x + ((viewDomain.f2Max - f2) / (viewDomain.f2Max - viewDomain.f2Min)) * plot.w; }
+    function yScale(f1) { return plot.y + ((f1 - viewDomain.f1Min) / (viewDomain.f1Max - viewDomain.f1Min)) * plot.h; }
     function esc(s) { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+    function roundTick(value) { return Math.abs(value) >= 100 ? Math.round(value) : Number(value.toFixed(1)); }
+    function niceStep(range, targetCount = 6) {
+      const raw = range / targetCount;
+      const power = 10 ** Math.floor(Math.log10(raw));
+      const normalized = raw / power;
+      const multiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+      return multiplier * power;
+    }
+    function makeAxisTicks(min, max, baseTicks) {
+      const baseRange = max - min;
+      if (Math.abs(min - domain.f2Min) < .001 || Math.abs(min - domain.f1Min) < .001) {
+        if (Math.abs(baseRange - (domain.f2Max - domain.f2Min)) < .001 || Math.abs(baseRange - (domain.f1Max - domain.f1Min)) < .001) return baseTicks;
+      }
+      const step = niceStep(baseRange);
+      const ticks = [];
+      for (let tick = Math.ceil(min / step) * step; tick < max - step * .05; tick += step) {
+        if (tick > min + step * .05) ticks.push(roundTick(tick));
+      }
+      return ticks.length ? [...new Set(ticks)] : [roundTick((min + max) / 2)];
+    }
+    function clampViewDomain() {
+      const clampAxis = (min, max, baseMin, baseMax) => {
+        let shift = 0;
+        if (min < baseMin) shift = baseMin - min;
+        if (max + shift > baseMax) shift += baseMax - (max + shift);
+        return [min + shift, max + shift];
+      };
+      [viewDomain.f2Min, viewDomain.f2Max] = clampAxis(viewDomain.f2Min, viewDomain.f2Max, domain.f2Min, domain.f2Max);
+      [viewDomain.f1Min, viewDomain.f1Max] = clampAxis(viewDomain.f1Min, viewDomain.f1Max, domain.f1Min, domain.f1Max);
+    }
+    function syncZoomScale() {
+      const f2Scale = (domain.f2Max - domain.f2Min) / (viewDomain.f2Max - viewDomain.f2Min);
+      const f1Scale = (domain.f1Max - domain.f1Min) / (viewDomain.f1Max - viewDomain.f1Min);
+      zoom.scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(f2Scale, f1Scale)));
+    }
+    function getSvgPoint(e) {
+      const rect = svg.getBoundingClientRect();
+      const viewBox = svg.viewBox.baseVal;
+      return { x: (e.clientX - rect.left) * viewBox.width / rect.width, y: (e.clientY - rect.top) * viewBox.height / rect.height };
+    }
+    function zoomAt(x, y, factor) {
+      const px = Math.max(plot.x, Math.min(plot.x + plot.w, x));
+      const py = Math.max(plot.y, Math.min(plot.y + plot.h, y));
+      const xRatio = (px - plot.x) / plot.w;
+      const yRatio = (py - plot.y) / plot.h;
+      const currentF2Range = viewDomain.f2Max - viewDomain.f2Min;
+      const currentF1Range = viewDomain.f1Max - viewDomain.f1Min;
+      const nextF2Range = Math.max((domain.f2Max - domain.f2Min) / MAX_ZOOM, Math.min(domain.f2Max - domain.f2Min, currentF2Range / factor));
+      const nextF1Range = Math.max((domain.f1Max - domain.f1Min) / MAX_ZOOM, Math.min(domain.f1Max - domain.f1Min, currentF1Range / factor));
+      const anchorF2 = viewDomain.f2Max - xRatio * currentF2Range;
+      const anchorF1 = viewDomain.f1Min + yRatio * currentF1Range;
+      viewDomain = {
+        f2Min: anchorF2 - (1 - xRatio) * nextF2Range,
+        f2Max: anchorF2 + xRatio * nextF2Range,
+        f1Min: anchorF1 - yRatio * nextF1Range,
+        f1Max: anchorF1 + (1 - yRatio) * nextF1Range
+      };
+      clampViewDomain();
+      syncZoomScale();
+    }
+    function panBy(dx, dy) {
+      const f2Shift = dx * (viewDomain.f2Max - viewDomain.f2Min) / plot.w;
+      const f1Shift = dy * (viewDomain.f1Max - viewDomain.f1Min) / plot.h;
+      viewDomain = { f2Min: viewDomain.f2Min + f2Shift, f2Max: viewDomain.f2Max + f2Shift, f1Min: viewDomain.f1Min + f1Shift, f1Max: viewDomain.f1Max + f1Shift };
+      clampViewDomain();
+      syncZoomScale();
+    }
 
     function drawGrid() {
-      const f2Ticks = [600, 1000, 1400, 1800, 2200, 2600, 2800];
-      const f1Ticks = [150, 300, 450, 600, 750, 900];
+      const baseF2Ticks = [600, 1000, 1400, 1800, 2200, 2600, 2800];
+      const baseF1Ticks = [150, 300, 450, 600, 750, 900];
+      const f2Ticks = zoom.scale === MIN_ZOOM ? baseF2Ticks : makeAxisTicks(viewDomain.f2Min, viewDomain.f2Max, baseF2Ticks);
+      const f1Ticks = zoom.scale === MIN_ZOOM ? baseF1Ticks : makeAxisTicks(viewDomain.f1Min, viewDomain.f1Max, baseF1Ticks);
       const vowelHints = [
         ['ㅣ', 280, 2500], ['ㅔ', 430, 2130], ['ㅐ', 520, 1880], ['ㅏ', 720, 1250],
         ['ㅓ', 510, 1020], ['ㅡ', 400, 1500], ['ㅗ', 390, 900], ['ㅜ', 290, 800]
@@ -577,7 +649,11 @@
       updateStats(visible.length);
       updateSummary(visible.length);
     }
-    function applyZoom() { plotContent.setAttribute('transform', `translate(${zoom.tx} ${zoom.ty}) scale(${zoom.scale})`); }
+    function applyZoom() {
+      plotContent.removeAttribute('transform');
+      const zoomStatus = document.getElementById('zoomStatus');
+      if (zoomStatus) zoomStatus.textContent = `현재 ${Math.round(zoom.scale * 100)}% · 제한 ${MIN_ZOOM * 100}~${MAX_ZOOM * 100}%`;
+    }
     function showTooltip(e, d) {
       if (!d) return;
       const isMic = d.source === 'microphone';
@@ -927,19 +1003,23 @@
     });
     svg.addEventListener('wheel', e => {
       e.preventDefault();
+      const point = getSvgPoint(e);
       const factor = e.deltaY < 0 ? 1.12 : 0.89;
-      zoom.scale = Math.max(.75, Math.min(4, zoom.scale * factor));
-      applyZoom();
+      zoomAt(point.x, point.y, factor);
+      render();
     }, { passive: false });
     svg.addEventListener('pointerdown', e => {
       if (e.target.closest('.point')) return;
-      drag = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
+      drag = { point: getSvgPoint(e), viewDomain: { ...viewDomain } };
       svg.setPointerCapture(e.pointerId);
       svg.style.cursor = 'grabbing';
     });
     svg.addEventListener('pointermove', e => {
       if (!drag) return;
-      zoom.tx = drag.tx + e.clientX - drag.x; zoom.ty = drag.ty + e.clientY - drag.y; applyZoom();
+      const point = getSvgPoint(e);
+      viewDomain = { ...drag.viewDomain };
+      panBy(point.x - drag.point.x, point.y - drag.point.y);
+      render();
     });
     svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
