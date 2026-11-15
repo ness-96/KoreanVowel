@@ -725,7 +725,7 @@
           .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
           .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
         shapeLabel = selectedSpeaker;
-      } else if (selectedAge === 'average' && selectedGender === 'all') {
+      } else if ((selectedAge === '평균' || selectedAge === 'average') && selectedGender === 'all') {
         const grouped = new Map();
         filteredAverageData()
           .filter(d => VOWEL_TRIANGLE_ORDER.includes(d.vowel))
