@@ -155,6 +155,18 @@
 
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
     .field.full { grid-column: 1 / -1; }
+    .batch-input-heading { display: flex; align-items: baseline; justify-content: space-between; margin-top: 15px; color: #708097; font-size: 11px; font-weight: 800; }
+    .batch-input-heading small { color: #9aa6b6; font-size: 10px; font-weight: 600; }
+    .batch-input-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+    .batch-input-card { padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .batch-vowel-head { display: flex; align-items: baseline; gap: 5px; margin-bottom: 8px; }
+    .batch-vowel-head strong { color: var(--navy); font-size: 18px; line-height: 1; }
+    .batch-vowel-head span { color: #8290a3; font-size: 10px; }
+    .batch-formant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .batch-formant-label { display: block; color: #8290a3; font-size: 9px; font-weight: 800; }
+    .batch-formant-input { width: 100%; margin-top: 3px; border: 1px solid var(--line); border-radius: 7px; padding: 7px 6px; color: var(--ink); background: #fff; outline: none; font-size: 11px; }
+    .batch-formant-input:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
+    .batch-formant-input::placeholder { color: #b2bcc9; }
     .field label { display: block; margin-bottom: 5px; color: #718096; font-size: 11px; font-weight: 700; }
     .field input, .field select {
       width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px;
@@ -217,6 +229,11 @@
       .metric-box { display: none; }
       .chart-wrap { margin: 0 6px; min-height: 500px; }
       #chart { height: 500px; }
+      .batch-input-grid { gap: 7px; }
+      .batch-input-card { padding: 9px; }
+    }
+    @media (max-width: 380px) {
+      .batch-input-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -341,8 +358,8 @@
         <section class="panel">
           <div class="panel-head">
             <div>
-              <div class="panel-title">모음 값 추가</div>
-              <div class="panel-caption">ID 하나당 ㅡ·ㅓ·ㅏ·ㅜ·ㅗ·ㅣ·ㅔ·ㅐ를 각각 한 번씩만 입력할 수 있습니다.</div>
+              <div class="panel-title">모음 값 일괄 추가</div>
+              <div class="panel-caption">한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.</div>
             </div>
           </div>
           <form id="pointForm">
@@ -366,11 +383,10 @@
               <div class="field"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
               <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
               <div class="field"><label for="age">연령대</label><select id="age" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
-              <div class="field"><label for="vowel">모음</label><select id="vowel" required><option>ㅣ</option><option>ㅔ</option><option>ㅐ</option><option>ㅏ</option><option>ㅓ</option><option>ㅡ</option><option>ㅗ</option><option>ㅜ</option></select></div>
-              <div class="field"><label for="f1">F1 (Hz)</label><input id="f1" type="number" min="100" max="1500" required placeholder="예: 430" /></div>
-              <div class="field"><label for="f2">F2 (Hz)</label><input id="f2" type="number" min="400" max="3500" required placeholder="예: 1900" /></div>
             </div>
-            <button class="submit-button" type="submit">분포도에 값 추가</button>
+            <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
+            <div class="batch-input-grid" id="batchInputGrid"></div>
+            <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
             <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
             <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
             <div class="data-note">같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.</div>
@@ -723,6 +739,20 @@
       countryField.hidden = !isOverseas;
       country.required = isOverseas;
       if (!isOverseas) country.value = '';
+    }
+    function renderBatchInputGrid() {
+      const grid = document.getElementById('batchInputGrid');
+      grid.innerHTML = VOWELS.map(vowel => `
+        <div class="batch-input-card">
+          <div class="batch-vowel-head"><strong>${vowel}</strong><span>${VOWEL_SYLLABLES[vowel]}</span></div>
+          <div class="batch-formant-grid">
+            <label class="batch-formant-label">F1<input class="batch-formant-input" id="batch-f1-${vowel}" type="number" min="100" max="1500" step="0.1" placeholder="430" /></label>
+            <label class="batch-formant-label">F2<input class="batch-formant-input" id="batch-f2-${vowel}" type="number" min="400" max="3500" step="0.1" placeholder="1900" /></label>
+          </div>
+        </div>`).join('');
+    }
+    function getBatchFormantValue(vowel, formant) {
+      return document.getElementById(`batch-${formant}-${vowel}`).value.trim();
     }
 
     function render() {
@@ -1096,40 +1126,79 @@
 
     document.getElementById('pointForm').addEventListener('submit', e => {
       e.preventDefault();
-      const item = {
-        id: `${document.getElementById('speakerId').value.trim()}-${document.getElementById('vowel').value}-${Date.now()}`,
-        speakerId: document.getElementById('speakerId').value.trim(),
-        region: document.getElementById('region').value,
-        country: document.getElementById('region').value === '해외' ? document.getElementById('overseasCountry').value.trim() : '',
-        nationality: document.getElementById('nationality').value.trim() || '미입력',
-        gender: document.getElementById('gender').value,
-        age: document.getElementById('age').value,
-        vowel: document.getElementById('vowel').value,
-        f1: Number(document.getElementById('f1').value),
-        f2: Number(document.getElementById('f2').value),
-        source: 'manual'
-      };
+      const speakerId = document.getElementById('speakerId').value.trim();
+      const region = document.getElementById('region').value;
+      const country = region === '해외' ? document.getElementById('overseasCountry').value.trim() : '';
       const formMessage = document.getElementById('formMessage');
       formMessage.textContent = '';
       formMessage.className = 'form-message';
-      if (!item.speakerId || !item.region || !item.f1 || !item.f2 || (item.region === '해외' && !item.country)) {
-        formMessage.textContent = item.region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '필수 항목을 모두 입력해 주세요.';
+      if (!speakerId || !region || (region === '해외' && !country)) {
+        formMessage.textContent = region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '화자 ID와 지역을 먼저 입력해 주세요.';
         formMessage.classList.add('visible', 'error');
         return;
       }
-      const hasDuplicate = data.some(d => d.speakerId === item.speakerId && d.vowel === item.vowel);
-      if (hasDuplicate) {
-        formMessage.textContent = `${item.speakerId} ID에는 이미 ${item.vowel} 값이 있습니다. 기존 값을 유지했으며, 같은 ID·모음은 다시 입력할 수 없습니다.`;
+      const incompleteVowels = [];
+      const entries = [];
+      VOWELS.forEach(vowel => {
+        const f1Text = getBatchFormantValue(vowel, 'f1');
+        const f2Text = getBatchFormantValue(vowel, 'f2');
+        if (!f1Text && !f2Text) return;
+        if (!f1Text || !f2Text) {
+          incompleteVowels.push(vowel);
+          return;
+        }
+        const f1 = Number(f1Text);
+        const f2 = Number(f2Text);
+        if (!Number.isFinite(f1) || !Number.isFinite(f2)) {
+          incompleteVowels.push(vowel);
+          return;
+        }
+        entries.push({ vowel, f1, f2 });
+      });
+      if (incompleteVowels.length) {
+        formMessage.textContent = `${incompleteVowels.join(', ')} 모음은 F1과 F2를 모두 입력해 주세요.`;
         formMessage.classList.add('visible', 'error');
         return;
       }
-      data.push(item);
+      if (!entries.length) {
+        formMessage.textContent = '최소 한 모음의 F1·F2 값을 입력해 주세요.';
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
+      const now = Date.now();
+      const duplicateVowels = [];
+      const newItems = entries.flatMap(({ vowel, f1, f2 }, index) => {
+        if (data.some(d => d.speakerId === speakerId && d.vowel === vowel)) {
+          duplicateVowels.push(vowel);
+          return [];
+        }
+        return [{
+          id: `${speakerId}-${vowel}-${now}-${index}`,
+          speakerId,
+          region,
+          country,
+          nationality: document.getElementById('nationality').value.trim() || '미입력',
+          gender: document.getElementById('gender').value,
+          age: document.getElementById('age').value,
+          vowel,
+          f1,
+          f2,
+          source: 'manual'
+        }];
+      });
+      if (!newItems.length) {
+        formMessage.textContent = `${speakerId} ID의 ${duplicateVowels.join(', ')} 값은 이미 있습니다. 기존 값을 유지했으며, 중복 값은 추가하지 않았습니다.`;
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
+      data.push(...newItems);
       saveData();
       e.target.reset();
       document.getElementById('gender').value = 'female';
       document.getElementById('age').value = '20대';
       updateRegionField();
-      formMessage.textContent = `${item.speakerId} ID의 ${item.vowel} 값이 추가되었습니다.`;
+      const duplicateNotice = duplicateVowels.length ? ` 이미 있던 ${duplicateVowels.join(', ')} 값은 기존 값을 유지했습니다.` : '';
+      formMessage.textContent = `${speakerId} ID의 ${newItems.length}개 모음값이 추가되었습니다.${duplicateNotice}`;
       formMessage.classList.add('visible', 'success');
       render();
     });
@@ -1245,6 +1314,7 @@
     svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
 
+    renderBatchInputGrid();
     updateMicPrompt();
     updateRegionField();
     render();
