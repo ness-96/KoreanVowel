@@ -442,8 +442,13 @@
     let micRecognition = null;
     let micRecognitionEnded = true;
     let micRecognitionCandidates = [];
+    let micRecognitionFinalCandidates = [];
     let micRecognitionTranscript = '';
+    let micRecognitionFinalTranscript = '';
+    let micRecognitionSegments = [];
     let micRecognitionError = '';
+    let micRecognitionRestartCount = 0;
+    let micFinishTimer = null;
     let micStopRequested = false;
     let micAnalysisSnapshot = null;
     let pendingDeletion = null;
@@ -696,11 +701,12 @@
     }
 
     function normalizeSttText(text) {
-      return String(text || '').toLowerCase().replace(/[“”"'‘’.,!?\s]/g, '');
+      return String(text || '').normalize('NFKC').toLowerCase().replace(/[^가-힣a-z0-9]/g, '');
     }
     function sttMatchesTarget(candidates, target) {
       const normalizedTarget = normalizeSttText(target);
-      return candidates.some(candidate => normalizeSttText(candidate).includes(normalizedTarget));
+      if (!normalizedTarget) return false;
+      return [...new Set(candidates.filter(Boolean))].some(candidate => normalizeSttText(candidate).includes(normalizedTarget));
     }
 
     function estimateMicFormants(frames, sampleRate, fftSize) {
@@ -735,25 +741,48 @@
       micAnimationFrame = requestAnimationFrame(monitorMic);
     }
 
+    function scheduleMicFinish(delay = 350) {
+      if (micFinishTimer) clearTimeout(micFinishTimer);
+      micFinishTimer = setTimeout(() => {
+        micFinishTimer = null;
+        if (micStopRequested) finishMicRecording();
+      }, delay);
+    }
     function finishMicRecording() {
       if (!micAnalysisSnapshot) return;
+      if (micFinishTimer) { clearTimeout(micFinishTimer); micFinishTimer = null; }
       const analysis = micAnalysisSnapshot;
       micAnalysisSnapshot = null;
       const vowel = document.getElementById('micVowel').value;
       const target = VOWEL_STT_TARGETS[vowel];
-      const transcript = micRecognitionTranscript || micRecognitionCandidates[0] || '';
-      const sttAllowed = micRecognitionError !== 'not-allowed' && micRecognitionError !== 'service-not-allowed';
+      const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
+      const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
+      const transcript = micRecognitionFinalTranscript || micRecognitionTranscript || sttCandidates[0] || '';
+      const recognitionError = micRecognitionError;
+      const permissionError = recognitionError === 'not-allowed' || recognitionError === 'service-not-allowed';
+      const serviceError = recognitionError === 'network' || recognitionError === 'audio-capture' || recognitionError === 'language-not-supported';
       micRecognition = null;
       micRecognitionEnded = true;
       micStopRequested = false;
-      if (!sttAllowed) {
+      micRecognitionRestartCount = 0;
+      if (permissionError) {
         document.getElementById('micStatus').textContent = '음성 인식 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해 주세요.';
         document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>음성 인식 권한을 확인해 주세요.';
         return;
       }
-      if (!sttMatchesTarget(micRecognitionCandidates, target)) {
+      if (serviceError) {
+        document.getElementById('micStatus').textContent = '음성 인식 서비스 연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.';
+        document.getElementById('micResult').innerHTML = `<strong>STT 연결 실패</strong><br>음성 인식 오류: ${esc(recognitionError)}`;
+        return;
+      }
+      if (!sttCandidates.length) {
+        document.getElementById('micStatus').textContent = 'STT 전사 결과를 받지 못했습니다. 문장을 조금 더 크게 읽고 다시 시도해 주세요.';
+        document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>인식된 전사 결과가 없습니다. 마이크 권한과 입력 장치를 확인해 주세요.';
+        return;
+      }
+      if (!sttMatchesTarget(sttCandidates, target)) {
         document.getElementById('micStatus').textContent = '표적 단어가 정확히 전사되지 않았습니다. 운반 문장을 다시 읽어 주세요.';
-        document.getElementById('micResult').innerHTML = `<strong>STT 확인 실패</strong><br>전사 결과: ${esc(transcript || '인식 결과 없음')}<br>큰따옴표 안의 “${esc(target)}”가 확인되지 않았습니다. 운반 문장을 다시 읽어 주세요.`;
+        document.getElementById('micResult').innerHTML = `<strong>STT 확인 실패</strong><br>전사 결과: ${esc(transcript)}<br>큰따옴표 안의 “${esc(target)}”가 확인되지 않았습니다. 운반 문장을 다시 읽어 주세요.`;
         return;
       }
       document.getElementById('micStatus').textContent = 'STT 전사가 확인되었습니다. F1·F2를 분석 중입니다.';
@@ -785,36 +814,66 @@
       }
       try {
         micRecognition = new SpeechRecognitionClass();
-        micRecognition.lang = 'ko-KR';
-        micRecognition.continuous = true;
-        micRecognition.interimResults = true;
-        micRecognition.maxAlternatives = 3;
+        const recognition = micRecognition;
+        recognition.lang = 'ko-KR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 5;
         micRecognitionEnded = false;
         micRecognitionCandidates = [];
+        micRecognitionFinalCandidates = [];
         micRecognitionTranscript = '';
+        micRecognitionFinalTranscript = '';
+        micRecognitionSegments = [];
         micRecognitionError = '';
+        micRecognitionRestartCount = 0;
         micStopRequested = false;
-        micRecognition.onresult = event => {
+        recognition.onresult = event => {
           const alternatives = [];
           const finalAlternatives = [];
           const finalTexts = [];
+          const interimTexts = [];
           for (let i = 0; i < event.results.length; i += 1) {
             const result = event.results[i];
             for (let j = 0; j < result.length; j += 1) alternatives.push(result[j].transcript);
             if (result.isFinal) {
-              finalTexts.push(result[0].transcript);
+              const bestText = result[0] && result[0].transcript ? result[0].transcript : '';
+              finalTexts.push(bestText);
+              micRecognitionSegments[i] = bestText;
               for (let j = 0; j < result.length; j += 1) finalAlternatives.push(result[j].transcript);
+            } else if (result[0] && result[0].transcript) {
+              interimTexts.push(result[0].transcript);
             }
           }
-          micRecognitionCandidates = finalAlternatives.length ? finalAlternatives : alternatives;
-          micRecognitionTranscript = finalTexts.join(' ') || micRecognitionCandidates[0] || '';
+          micRecognitionRestartCount = 0;
+          micRecognitionCandidates = [...new Set([...micRecognitionCandidates, ...alternatives].filter(Boolean))];
+          micRecognitionFinalCandidates = [...new Set([...micRecognitionFinalCandidates, ...finalAlternatives].filter(Boolean))];
+          micRecognitionFinalTranscript = micRecognitionSegments.filter(Boolean).join(' ').trim() || finalTexts.join(' ').trim();
+          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || '';
+          if (micRecognitionTranscript) {
+            document.getElementById('micResult').innerHTML = `<strong>STT 전사 중</strong><br>${esc(micRecognitionTranscript)}`;
+          }
         };
-        micRecognition.onerror = event => {
+        recognition.onerror = event => {
           micRecognitionError = event.error || 'unknown';
         };
-        micRecognition.onend = () => {
+        recognition.onend = () => {
           micRecognitionEnded = true;
-          if (micStopRequested) finishMicRecording();
+          if (micStopRequested) {
+            scheduleMicFinish(350);
+            return;
+          }
+          const restartable = micStream && !['not-allowed', 'service-not-allowed', 'network', 'audio-capture', 'language-not-supported'].includes(micRecognitionError);
+          if (restartable && micRecognitionRestartCount < 2) {
+            micRecognitionRestartCount += 1;
+            setTimeout(() => {
+              if (!micStream || micStopRequested || micRecognition !== recognition) return;
+              try {
+                recognition.start();
+                micRecognitionEnded = false;
+              } catch (error) {}
+            }, 150);
+          }
         };
         micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -871,10 +930,14 @@
       document.getElementById('micStartBtn').disabled = false;
       document.getElementById('micStopBtn').disabled = true;
       document.getElementById('micStatus').textContent = 'STT 전사를 확인 중입니다.';
-      if (micRecognition && !micRecognitionEnded) {
+      if (!micRecognition) {
+        finishMicRecording();
+        return;
+      }
+      if (!micRecognitionEnded) {
         try { micRecognition.stop(); } catch (error) { micRecognitionEnded = true; }
       }
-      if (micRecognitionEnded) finishMicRecording();
+      scheduleMicFinish(700);
     }
 
     document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
