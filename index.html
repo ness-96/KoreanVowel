@@ -474,6 +474,7 @@
     let selectedAge = 'all';
     let selectedSpeaker = 'all';
     let selectedVowel = 'all';
+    let selectedAverageSeries = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
     let micPoint = null;
@@ -667,30 +668,44 @@
       const deleteAverage = document.getElementById('deleteAverageSelect');
       deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => `<option value="${esc(d.id)}">${esc(d.age)} · ${d.gender === 'female' ? '여성' : '남성'} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2}</option>`).join('');
     }
+    function averageSeriesKey(d) {
+      return `${d.age}|${d.gender}`;
+    }
+    function averageSeriesLabel(d) {
+      const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
+      return d.age === '평균' ? `${genderLabel} 평균` : `${d.age} ${genderLabel} 평균`;
+    }
     function drawSpeakerShape() {
       const lineLayer = document.getElementById('speakerLineLayer');
       const summary = document.getElementById('speakerShapeSummary');
       if (!lineLayer) return;
-      if (selectedSpeaker === 'all') {
+      let shapeData = [];
+      let shapeLabel = '';
+      if (selectedAverageSeries !== 'all') {
+        shapeData = averageData
+          .filter(d => averageSeriesKey(d) === selectedAverageSeries && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
+          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
+        shapeLabel = shapeData.length ? averageSeriesLabel(shapeData[0]) : '선택한 평균';
+      } else if (selectedSpeaker !== 'all') {
+        shapeData = filteredData()
+          .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
+          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
+        shapeLabel = selectedSpeaker;
+      }
+      if (shapeData.length < 2) {
         lineLayer.innerHTML = '';
-        summary.textContent = '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과를 강조하고 클릭한 화자의 모음 모양을 연결합니다.';
+        summary.textContent = selectedAverageSeries !== 'all' || selectedSpeaker !== 'all'
+          ? `${shapeLabel}: 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.`
+          : '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과를 강조하고 클릭한 화자 또는 평균 집단의 모음 모양을 연결합니다.';
         return;
       }
-      const speakerData = filteredData()
-        .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-        .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
-      if (speakerData.length < 2) {
-        lineLayer.innerHTML = '';
-        summary.textContent = `${selectedSpeaker}: 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.`;
-        return;
-      }
-      const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
-      const nodes = speakerData.map(d => `<text class="speaker-node" x="${xScale(d.f2)}" y="${yScale(d.f1)}" aria-label="${esc(d.vowel)}">${esc(d.vowel)}</text>`).join('');
-      const closesTriangle = speakerData.some(d => d.vowel === 'ㅣ') && speakerData.some(d => d.vowel === 'ㅡ');
+      const points = shapeData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
+      const nodes = shapeData.map(d => `<text class="speaker-node" x="${xScale(d.f2)}" y="${yScale(d.f1)}" aria-label="${esc(d.vowel)}">${esc(d.vowel)}</text>`).join('');
+      const closesTriangle = shapeData.some(d => d.vowel === 'ㅣ') && shapeData.some(d => d.vowel === 'ㅡ');
       const shapeTag = closesTriangle ? 'polygon' : 'polyline';
       const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
-      lineLayer.innerHTML = `<${shapeTag} class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
-      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
+      lineLayer.innerHTML = `<${shapeTag} class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(shapeData[0].f2)+10}" y="${yScale(shapeData[0].f1)-10}">${esc(shapeLabel)}</text>`;
+      summary.textContent = `${shapeLabel}: ${shapeData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
     }
     function pointOpacity(d) {
       if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
@@ -785,8 +800,9 @@
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
           if (!d.vowel) return;
-          selectedVowel = selectedVowel === d.vowel ? 'all' : d.vowel;
-          selectedSpeaker = d.speakerId || 'all';
+          selectedVowel = d.vowel;
+          selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
+          selectedSpeaker = d.source === 'average' ? 'all' : d.speakerId || 'all';
           selectedGender = 'all';
           selectedAge = 'all';
           document.querySelectorAll('#genderFilter button').forEach(button => button.classList.toggle('active', button.dataset.gender === selectedGender));
@@ -1108,6 +1124,7 @@
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
       selectedSpeaker = e.target.value;
+      selectedAverageSeries = 'all';
       selectedVowel = 'all';
       render();
     });
