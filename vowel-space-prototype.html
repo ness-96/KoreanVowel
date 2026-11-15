@@ -671,7 +671,7 @@
       if (!lineLayer) return;
       if (selectedSpeaker === 'all') {
         lineLayer.innerHTML = '';
-        summary.textContent = '화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.';
+        summary.textContent = '화자 선택 메뉴에서 고르거나 분포도 점을 클릭하면 해당 화자의 모음 점을 순서대로 연결합니다.';
         return;
       }
       const speakerData = filteredData()
@@ -779,6 +779,11 @@
         point.addEventListener('mouseenter', e => showTooltip(e, d));
         point.addEventListener('mousemove', e => moveTooltip(e));
         point.addEventListener('mouseleave', hideTooltip);
+        point.addEventListener('click', () => {
+          if (point.dataset.average || d.source === 'microphone' || !d.speakerId) return;
+          selectedSpeaker = d.speakerId;
+          render();
+        });
       });
       drawSpeakerShape();
       applyZoom();
