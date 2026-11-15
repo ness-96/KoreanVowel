@@ -309,6 +309,7 @@
           <span class="section-label">연령대</span>
           <div class="age-grid" id="ageFilter">
             <button class="age-button active" data-age="all">전체</button>
+            <button class="age-button" data-age="평균">평균</button>
             <button class="age-button" data-age="10대">10대</button>
             <button class="age-button" data-age="20대">20대</button>
             <button class="age-button" data-age="30대">30대</button>
@@ -359,13 +360,13 @@
           <div class="panel-head">
             <div>
               <div class="panel-title">모음 값 일괄 추가</div>
-              <div class="panel-caption">한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.</div>
+              <div class="panel-caption" id="pointFormCaption">한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.</div>
             </div>
           </div>
           <form id="pointForm">
             <div class="form-grid">
-              <div class="field"><label for="speakerId">화자 ID</label><input id="speakerId" required placeholder="예: K101" /></div>
-              <div class="field"><label for="region">지역</label><select id="region" required>
+              <div class="field" id="speakerIdField"><label for="speakerId">화자 ID</label><input id="speakerId" placeholder="예: K101" /></div>
+              <div class="field" id="regionField"><label for="region">지역</label><select id="region">
                 <option value="">지역을 선택하세요</option>
                 <option value="서울">서울</option>
                 <option value="경기">경기</option>
@@ -380,37 +381,16 @@
                 <option value="해외">해외</option>
               </select></div>
               <div class="field full" id="overseasCountryField" hidden><label for="overseasCountry">해외 국가</label><input id="overseasCountry" placeholder="예: 미국" /></div>
-              <div class="field"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
+              <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
               <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
-              <div class="field"><label for="age">연령대</label><select id="age" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
+              <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
             </div>
             <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
             <div class="batch-input-grid" id="batchInputGrid"></div>
             <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
             <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
             <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
-            <div class="data-note">같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.</div>
-          </form>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">연령대·성별 평균값 추가</div>
-              <div class="panel-caption">각 연령대의 남성·여성 평균 F1/F2를 모음별로 입력합니다.</div>
-            </div>
-          </div>
-          <form id="averageForm">
-            <div class="form-grid">
-              <div class="field"><label for="averageGender">성별</label><select id="averageGender" required><option value="female">여성</option><option value="male">남성</option></select></div>
-              <div class="field"><label for="averageAge">연령대</label><select id="averageAge" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
-              <div class="field full"><label for="averageVowel">모음</label><select id="averageVowel" required><option>ㅣ</option><option>ㅔ</option><option>ㅐ</option><option>ㅏ</option><option>ㅓ</option><option>ㅡ</option><option>ㅗ</option><option>ㅜ</option></select></div>
-              <div class="field"><label for="averageF1">평균 F1 (Hz)</label><input id="averageF1" type="number" min="100" max="1500" step="0.1" required placeholder="예: 430" /></div>
-              <div class="field"><label for="averageF2">평균 F2 (Hz)</label><input id="averageF2" type="number" min="400" max="3500" step="0.1" required placeholder="예: 1900" /></div>
-            </div>
-            <button class="submit-button" type="submit">평균값 추가</button>
-            <div class="form-message" id="averageFormMessage" role="status" aria-live="polite"></div>
-            <div class="data-note">같은 연령대·성별·모음 평균은 한 번만 입력할 수 있습니다. 수정하려면 기존 평균값을 삭제한 뒤 다시 입력해 주세요.</div>
+            <div class="data-note" id="inputRuleNote">같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.</div>
           </form>
         </section>
 
@@ -485,7 +465,7 @@
       'ㅜ': '나는 “우다”라고 말합니다.'
     };
     const VOWEL_STT_TARGETS = { 'ㅣ':'이다', 'ㅔ':'에다', 'ㅐ':'애다', 'ㅏ':'아다', 'ㅓ':'어다', 'ㅡ':'으다', 'ㅗ':'오다', 'ㅜ':'우다' };
-    const AGE_GROUPS = ['10대','20대','30대','40대','50대','60대','70대'];
+    const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     const AVERAGE_STORAGE_KEY = 'vowel-space-prototype-v2-averages';
     let data = loadData();
@@ -740,6 +720,36 @@
       country.required = isOverseas;
       if (!isOverseas) country.value = '';
     }
+    function updateInputMode() {
+      const isAverage = document.getElementById('age').value === 'average';
+      const speakerIdField = document.getElementById('speakerIdField');
+      const regionField = document.getElementById('regionField');
+      const countryField = document.getElementById('overseasCountryField');
+      const nationalityField = document.getElementById('nationalityField');
+      const speakerId = document.getElementById('speakerId');
+      const region = document.getElementById('region');
+      const country = document.getElementById('overseasCountry');
+      const nationality = document.getElementById('nationality');
+      const caption = document.getElementById('pointFormCaption');
+      const note = document.getElementById('inputRuleNote');
+      [speakerIdField, regionField, countryField, nationalityField].forEach(field => { if (field) field.hidden = isAverage; });
+      [speakerId, region, country, nationality].forEach(field => { if (field) field.disabled = isAverage; });
+      speakerId.required = !isAverage;
+      region.required = !isAverage;
+      country.required = !isAverage && region.value === '해외';
+      if (isAverage) {
+        speakerId.value = '';
+        region.value = '';
+        country.value = '';
+        nationality.value = '대한민국';
+        caption.textContent = '성별 평균의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 평균값으로 추가됩니다.';
+        note.textContent = '평균을 선택하면 화자 ID·지역 없이 성별 평균값으로 저장됩니다. 같은 성별·모음 평균은 중복 입력할 수 없습니다.';
+      } else {
+        caption.textContent = '한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.';
+        note.textContent = '같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.';
+        updateRegionField();
+      }
+    }
     function renderBatchInputGrid() {
       const grid = document.getElementById('batchInputGrid');
       grid.innerHTML = VOWELS.map(vowel => `
@@ -793,7 +803,7 @@
       const isMic = d.source === 'microphone';
       const isAverage = d.source === 'average';
       const genderLabel = d.gender === 'female' ? '여성' : '남성';
-      const title = isAverage ? `${d.age} ${genderLabel} 평균 · ${d.vowel}` : `${d.vowel} · ${d.speakerId}`;
+      const title = isAverage ? `${d.age === '평균' ? '' : d.age + ' '}${genderLabel} 평균 · ${d.vowel}` : `${d.vowel} · ${d.speakerId}`;
       const locationDetails = d.region === '해외'
         ? `<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>${esc(d.country || '미입력')}</b></div>`
         : `<div class="tooltip-row"><span>지역</span><b>${esc(locationLabel(d))}</b></div>`;
@@ -1074,6 +1084,7 @@
 
     document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
     document.getElementById('region').addEventListener('change', updateRegionField);
+    document.getElementById('age').addEventListener('change', updateInputMode);
     document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
     document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
     document.getElementById('genderFilter').addEventListener('click', e => {
@@ -1126,13 +1137,16 @@
 
     document.getElementById('pointForm').addEventListener('submit', e => {
       e.preventDefault();
+      const ageValue = document.getElementById('age').value;
+      const isAverage = ageValue === 'average';
       const speakerId = document.getElementById('speakerId').value.trim();
       const region = document.getElementById('region').value;
       const country = region === '해외' ? document.getElementById('overseasCountry').value.trim() : '';
+      const gender = document.getElementById('gender').value;
       const formMessage = document.getElementById('formMessage');
       formMessage.textContent = '';
       formMessage.className = 'form-message';
-      if (!speakerId || !region || (region === '해외' && !country)) {
+      if (!isAverage && (!speakerId || !region || (region === '해외' && !country))) {
         formMessage.textContent = region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '화자 ID와 지역을 먼저 입력해 주세요.';
         formMessage.classList.add('visible', 'error');
         return;
@@ -1156,7 +1170,7 @@
         entries.push({ vowel, f1, f2 });
       });
       if (incompleteVowels.length) {
-        formMessage.textContent = `${incompleteVowels.join(', ')} 모음은 F1과 F2를 모두 입력해 주세요.`;
+        formMessage.textContent = incompleteVowels.join(', ') + ' 모음은 F1과 F2를 모두 입력해 주세요.';
         formMessage.classList.add('visible', 'error');
         return;
       }
@@ -1165,21 +1179,56 @@
         formMessage.classList.add('visible', 'error');
         return;
       }
+      const genderLabel = gender === 'female' ? '여성' : '남성';
       const now = Date.now();
       const duplicateVowels = [];
+      if (isAverage) {
+        const newItems = entries.flatMap(({ vowel, f1, f2 }) => {
+          if (averageData.some(d => d.age === '평균' && d.gender === gender && d.vowel === vowel)) {
+            duplicateVowels.push(vowel);
+            return [];
+          }
+          return [{
+            id: 'average-평균-' + gender + '-' + vowel,
+            age: '평균',
+            gender,
+            vowel,
+            f1,
+            f2,
+            source: 'average'
+          }];
+        });
+        if (!newItems.length) {
+          formMessage.textContent = genderLabel + ' 평균의 ' + duplicateVowels.join(', ') + ' 값은 이미 있습니다. 기존 값을 유지했으며, 중복 평균값은 추가하지 않았습니다.';
+          formMessage.classList.add('visible', 'error');
+          return;
+        }
+        averageData.push(...newItems);
+        saveAverageData();
+        e.target.reset();
+        document.getElementById('gender').value = 'female';
+        document.getElementById('age').value = '20대';
+        updateRegionField();
+        updateInputMode();
+        const duplicateNotice = duplicateVowels.length ? ' 이미 있던 ' + duplicateVowels.join(', ') + ' 값은 기존 평균값을 유지했습니다.' : '';
+        formMessage.textContent = '평균 ' + genderLabel + '의 ' + newItems.length + '개 모음값이 추가되었습니다.' + duplicateNotice;
+        formMessage.classList.add('visible', 'success');
+        render();
+        return;
+      }
       const newItems = entries.flatMap(({ vowel, f1, f2 }, index) => {
         if (data.some(d => d.speakerId === speakerId && d.vowel === vowel)) {
           duplicateVowels.push(vowel);
           return [];
         }
         return [{
-          id: `${speakerId}-${vowel}-${now}-${index}`,
+          id: speakerId + '-' + vowel + '-' + now + '-' + index,
           speakerId,
           region,
           country,
           nationality: document.getElementById('nationality').value.trim() || '미입력',
-          gender: document.getElementById('gender').value,
-          age: document.getElementById('age').value,
+          gender,
+          age: ageValue,
           vowel,
           f1,
           f2,
@@ -1187,7 +1236,7 @@
         }];
       });
       if (!newItems.length) {
-        formMessage.textContent = `${speakerId} ID의 ${duplicateVowels.join(', ')} 값은 이미 있습니다. 기존 값을 유지했으며, 중복 값은 추가하지 않았습니다.`;
+        formMessage.textContent = speakerId + ' ID의 ' + duplicateVowels.join(', ') + ' 값은 이미 있습니다. 기존 값을 유지했으며, 중복 값은 추가하지 않았습니다.';
         formMessage.classList.add('visible', 'error');
         return;
       }
@@ -1197,38 +1246,9 @@
       document.getElementById('gender').value = 'female';
       document.getElementById('age').value = '20대';
       updateRegionField();
-      const duplicateNotice = duplicateVowels.length ? ` 이미 있던 ${duplicateVowels.join(', ')} 값은 기존 값을 유지했습니다.` : '';
-      formMessage.textContent = `${speakerId} ID의 ${newItems.length}개 모음값이 추가되었습니다.${duplicateNotice}`;
-      formMessage.classList.add('visible', 'success');
-      render();
-    });
-    document.getElementById('averageForm').addEventListener('submit', e => {
-      e.preventDefault();
-      const item = {
-        id: `average-${document.getElementById('averageAge').value}-${document.getElementById('averageGender').value}-${document.getElementById('averageVowel').value}`,
-        age: document.getElementById('averageAge').value,
-        gender: document.getElementById('averageGender').value,
-        vowel: document.getElementById('averageVowel').value,
-        f1: Number(document.getElementById('averageF1').value),
-        f2: Number(document.getElementById('averageF2').value),
-        source: 'average'
-      };
-      const formMessage = document.getElementById('averageFormMessage');
-      formMessage.textContent = '';
-      formMessage.className = 'form-message';
-      if (!item.age || !item.gender || !item.vowel || !item.f1 || !item.f2) return;
-      const hasDuplicate = averageData.some(d => d.age === item.age && d.gender === item.gender && d.vowel === item.vowel);
-      if (hasDuplicate) {
-        formMessage.textContent = `${item.age} ${item.gender === 'female' ? '여성' : '남성'}의 ${item.vowel} 평균값이 이미 있습니다. 기존 값을 유지했으며, 기존 평균값을 삭제한 뒤 다시 입력해 주세요.`;
-        formMessage.classList.add('visible', 'error');
-        return;
-      }
-      averageData.push(item);
-      saveAverageData();
-      e.target.reset();
-      document.getElementById('averageGender').value = 'female';
-      document.getElementById('averageAge').value = '20대';
-      formMessage.textContent = `${item.age} ${item.gender === 'female' ? '여성' : '남성'}의 ${item.vowel} 평균값이 추가되었습니다.`;
+      updateInputMode();
+      const duplicateNotice = duplicateVowels.length ? ' 이미 있던 ' + duplicateVowels.join(', ') + ' 값은 기존 값을 유지했습니다.' : '';
+      formMessage.textContent = speakerId + ' ID의 ' + newItems.length + '개 모음값이 추가되었습니다.' + duplicateNotice;
       formMessage.classList.add('visible', 'success');
       render();
     });
@@ -1317,6 +1337,7 @@
     renderBatchInputGrid();
     updateMicPrompt();
     updateRegionField();
+    updateInputMode();
     render();
   </script>
 </body>
