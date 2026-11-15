@@ -650,11 +650,22 @@
       plotContent.innerHTML = `<g class="grid">${gridHtml}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
     }
 
-    function hasExplicitMaleAverage() {
-      return averageData.some(d => (d.age === '평균' || d.age === 'average') && d.gender === 'male');
-    }
     function isLegacyAverageSpeaker(d) {
-      return d && d.speakerId === '남성 평균' && !hasExplicitMaleAverage();
+      const speakerId = String(d?.speakerId || '').replace(/\s+/g, '');
+      return Boolean(d && (d.gender === 'male' || d.gender === 'female') && speakerId.includes('평균'));
+    }
+    function averageEntryKey(d) {
+      const age = d.age === 'average' ? '평균' : d.age;
+      return age + '|' + d.gender + '|' + d.vowel;
+    }
+    function averageDisplayData() {
+      const explicit = averageData.map(d => ({ ...d, source: 'average' }));
+      const explicitKeys = new Set(explicit.map(averageEntryKey));
+      const legacy = data
+        .filter(isLegacyAverageSpeaker)
+        .map(d => ({ ...d, age: '평균', source: 'average' }))
+        .filter(d => !explicitKeys.has(averageEntryKey(d)));
+      return [...explicit, ...legacy];
     }
     function matchesSelectedAge(d) {
       if (selectedAge === 'all') return true;
@@ -662,10 +673,10 @@
       return d.age === selectedAge;
     }
     function filteredData() {
-      return data.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
+      return data.filter(d => !isLegacyAverageSpeaker(d) && (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function filteredAverageData() {
-      return averageData.filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
+      return averageDisplayData().filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function refreshDataSelectors() {
       const allSpeakers = [...new Set(data.map(d => d.speakerId))].sort();
@@ -695,7 +706,7 @@
       let shapeData = [];
       let shapeLabel = '';
       if (selectedAverageSeries !== 'all') {
-        shapeData = averageData
+        shapeData = averageDisplayData()
           .filter(d => averageSeriesKey(d) === selectedAverageSeries && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
           .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
         shapeLabel = shapeData.length ? averageSeriesLabel(shapeData[0]) : '선택한 평균';
@@ -798,7 +809,7 @@
       const layer = document.getElementById('pointsLayer');
       const visible = filteredData();
       const visibleAverages = filteredAverageData();
-      const corpusPoints = data.map(d => {
+      const corpusPoints = data.filter(d => !isLegacyAverageSpeaker(d)).map(d => {
         const fontSize = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 11 : 9;
         const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
         return `<text class='point vowel-point ${pointColorClass(d)}${selectedClass}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='${fontSize}' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`;
@@ -808,7 +819,7 @@
       layer.innerHTML = corpusPoints + averagePoints + micMarkup;
       layer.querySelectorAll('.point').forEach(point => {
         const d = point.dataset.average
-          ? averageData.find(item => item.id === point.dataset.id)
+          ? averageDisplayData().find(item => item.id === point.dataset.id)
           : micPoint && point.dataset.id === micPoint.id ? micPoint : data.find(item => item.id === point.dataset.id);
         if (!d) return;
         point.addEventListener('mouseenter', e => showTooltip(e, d));
