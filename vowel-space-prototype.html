@@ -348,7 +348,21 @@
           <form id="pointForm">
             <div class="form-grid">
               <div class="field"><label for="speakerId">화자 ID</label><input id="speakerId" required placeholder="예: K101" /></div>
-              <div class="field"><label for="region">지역</label><input id="region" required placeholder="예: 서울" /></div>
+              <div class="field"><label for="region">지역</label><select id="region" required>
+                <option value="">지역을 선택하세요</option>
+                <option value="서울">서울</option>
+                <option value="경기">경기</option>
+                <option value="강원">강원</option>
+                <option value="충북">충북</option>
+                <option value="충남">충남</option>
+                <option value="전북">전북</option>
+                <option value="전남">전남</option>
+                <option value="경북">경북</option>
+                <option value="경남">경남</option>
+                <option value="제주">제주</option>
+                <option value="해외">해외</option>
+              </select></div>
+              <div class="field full" id="overseasCountryField" hidden><label for="overseasCountry">해외 국가</label><input id="overseasCountry" placeholder="예: 미국" /></div>
               <div class="field"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
               <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
               <div class="field"><label for="age">연령대</label><select id="age" required><option>10대</option><option selected>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대</option><option>70대</option></select></div>
@@ -659,7 +673,7 @@
       const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
       deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
       const deleteValue = document.getElementById('deleteValueSelect');
-      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(d.region)}</option>`).join('');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(locationLabel(d))}</option>`).join('');
       const deleteAverage = document.getElementById('deleteAverageSelect');
       deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => `<option value="${esc(d.id)}">${esc(d.age)} · ${d.gender === 'female' ? '여성' : '남성'} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2}</option>`).join('');
     }
@@ -696,6 +710,19 @@
     function pointColorClass(d) {
       if (d.source === 'microphone') return 'mic-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
+    }
+    function locationLabel(d) {
+      if (d.region === '해외') return d.country ? `해외 · ${d.country}` : '해외';
+      return d.region || '미입력';
+    }
+    function updateRegionField() {
+      const region = document.getElementById('region');
+      const countryField = document.getElementById('overseasCountryField');
+      const country = document.getElementById('overseasCountry');
+      const isOverseas = region.value === '해외';
+      countryField.hidden = !isOverseas;
+      country.required = isOverseas;
+      if (!isOverseas) country.value = '';
     }
 
     function render() {
@@ -737,11 +764,14 @@
       const isAverage = d.source === 'average';
       const genderLabel = d.gender === 'female' ? '여성' : '남성';
       const title = isAverage ? `${d.age} ${genderLabel} 평균 · ${d.vowel}` : `${d.vowel} · ${d.speakerId}`;
+      const locationDetails = d.region === '해외'
+        ? `<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>${esc(d.country || '미입력')}</b></div>`
+        : `<div class="tooltip-row"><span>지역</span><b>${esc(locationLabel(d))}</b></div>`;
       const details = isMic
         ? `<div class="tooltip-row"><span>자료</span><b>마이크 예비 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
         : isAverage
           ? `<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div>`
-          : `<div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div><div class="tooltip-row"><span>지역</span><b>${esc(d.region)}</b></div>`;
+          : `<div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div>${locationDetails}`;
       tooltip.innerHTML = `<div class="tooltip-title">${esc(title)}</div>${details}<div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
       tooltip.classList.remove('hidden'); moveTooltip(e);
     }
@@ -1013,6 +1043,7 @@
     }
 
     document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
+    document.getElementById('region').addEventListener('change', updateRegionField);
     document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
     document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
     document.getElementById('genderFilter').addEventListener('click', e => {
@@ -1068,7 +1099,8 @@
       const item = {
         id: `${document.getElementById('speakerId').value.trim()}-${document.getElementById('vowel').value}-${Date.now()}`,
         speakerId: document.getElementById('speakerId').value.trim(),
-        region: document.getElementById('region').value.trim(),
+        region: document.getElementById('region').value,
+        country: document.getElementById('region').value === '해외' ? document.getElementById('overseasCountry').value.trim() : '',
         nationality: document.getElementById('nationality').value.trim() || '미입력',
         gender: document.getElementById('gender').value,
         age: document.getElementById('age').value,
@@ -1080,7 +1112,11 @@
       const formMessage = document.getElementById('formMessage');
       formMessage.textContent = '';
       formMessage.className = 'form-message';
-      if (!item.speakerId || !item.region || !item.f1 || !item.f2) return;
+      if (!item.speakerId || !item.region || !item.f1 || !item.f2 || (item.region === '해외' && !item.country)) {
+        formMessage.textContent = item.region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '필수 항목을 모두 입력해 주세요.';
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
       const hasDuplicate = data.some(d => d.speakerId === item.speakerId && d.vowel === item.vowel);
       if (hasDuplicate) {
         formMessage.textContent = `${item.speakerId} ID에는 이미 ${item.vowel} 값이 있습니다. 기존 값을 유지했으며, 같은 ID·모음은 다시 입력할 수 없습니다.`;
@@ -1092,6 +1128,7 @@
       e.target.reset();
       document.getElementById('gender').value = 'female';
       document.getElementById('age').value = '20대';
+      updateRegionField();
       formMessage.textContent = `${item.speakerId} ID의 ${item.vowel} 값이 추가되었습니다.`;
       formMessage.classList.add('visible', 'success');
       render();
@@ -1209,6 +1246,7 @@
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
 
     updateMicPrompt();
+    updateRegionField();
     render();
   </script>
 </body>
