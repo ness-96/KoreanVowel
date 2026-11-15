@@ -93,17 +93,17 @@
     .axis-label { fill: #66758a; font-size: 12px; font-weight: 700; }
     .tick-label { fill: #8290a3; font-size: 10px; }
     .vowel-guide { fill: #c3cedb; font-size: 19px; font-weight: 800; opacity: .64; pointer-events: none; }
-    .point { stroke: rgba(255,255,255,.92); stroke-width: 1.3; cursor: crosshair; transition: opacity .18s, r .18s; }
-    .point:hover { stroke: #1c2430; stroke-width: 2.1; }
+    .point { cursor: crosshair; transition: opacity .18s, font-size .18s; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; stroke: rgba(255,255,255,.96); stroke-width: 2.2px; stroke-linejoin: round; font-size: 18px; font-weight: 800; }
+    .point:hover { stroke: #1c2430; stroke-width: 2.8px; }
     .point.female { fill: var(--red); }
     .point.male { fill: #7e8998; }
     .point.other { fill: #8a94a4; }
-    .point.selected-speaker { stroke: #243a62; stroke-width: 2.5; }
+    .point.selected-speaker { stroke: #243a62; stroke-width: 3.2px; }
     .speaker-path { fill: none; stroke: #294a89; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .86; }
-    .speaker-node { fill: #fff; stroke: #294a89; stroke-width: 2.2; }
+    .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 2px; font-size: 18px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
-    .point.mic-point { fill: #4e7cf3; stroke: #fff; stroke-width: 2.5; }
-    .point.average-point { stroke: #1f3150; stroke-width: 2.8; stroke-dasharray: 2.5 1.5; }
+    .point.mic-point { fill: #4e7cf3; stroke: #fff; stroke-width: 2.8px; font-size: 23px; }
+    .point.average-point { stroke: #1f3150; stroke-width: 2.6px; stroke-dasharray: 2.5 1.5; font-size: 21px; }
     .average-label { fill: #1f3150; font-size: 10px; font-weight: 800; pointer-events: none; }
     .mic-label { fill: #315fc4; font-size: 11px; font-weight: 800; pointer-events: none; }
     .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
@@ -691,7 +691,7 @@
         return;
       }
       const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
-      const nodes = speakerData.map(d => `<circle class="speaker-node" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="5" />`).join('');
+      const nodes = speakerData.map(d => `<text class="speaker-node" x="${xScale(d.f2)}" y="${yScale(d.f1)}" aria-label="${esc(d.vowel)}">${esc(d.vowel)}</text>`).join('');
       const closesTriangle = speakerData.some(d => d.vowel === 'ㅣ') && speakerData.some(d => d.vowel === 'ㅡ');
       const shapeTag = closesTriangle ? 'polygon' : 'polyline';
       const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
@@ -772,21 +772,21 @@
       const visible = filteredData();
       const visibleAverages = filteredAverageData();
       const corpusPoints = data.map(d => {
-        const r = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 7.2 : 5.8;
+        const fontSize = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 22 : 18;
         const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
-        return `<circle class="point ${pointColorClass(d)}${selectedClass}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="${r}" opacity="${pointOpacity(d)}" data-id="${esc(d.id)}" />`;
+        return `<text class='point vowel-point ${pointColorClass(d)}${selectedClass}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='${fontSize}' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`;
       }).join('');
-      const averagePoints = visibleAverages.map(d => `<circle class="point average-point ${pointColorClass(d)}" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="9" opacity="1" data-id="${esc(d.id)}" data-average="true" />`).join('');
-      const micMarkup = micPoint ? `<circle class="point ${pointColorClass(micPoint)}" cx="${xScale(micPoint.f2)}" cy="${yScale(micPoint.f1)}" r="8" opacity="1" data-id="${esc(micPoint.id)}" /><text class="mic-label" x="${xScale(micPoint.f2)+11}" y="${yScale(micPoint.f1)-11}">내 발음</text>` : '';
+      const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='22' opacity='1' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
+      const micMarkup = micPoint ? `<text class='point vowel-point ${pointColorClass(micPoint)} mic-point' x='${xScale(micPoint.f2)}' y='${yScale(micPoint.f1)}' font-size='23' opacity='1' data-id='${esc(micPoint.id)}' data-vowel='${esc(micPoint.vowel)}' aria-label='${esc(micPoint.vowel)}'>${esc(micPoint.vowel)}</text><text class='mic-label' x='${xScale(micPoint.f2)+11}' y='${yScale(micPoint.f1)-11}'>내 발음</text>` : '';
       layer.innerHTML = corpusPoints + averagePoints + micMarkup;
-      layer.querySelectorAll('.point').forEach(circle => {
-        const d = circle.dataset.average
-          ? averageData.find(item => item.id === circle.dataset.id)
-          : micPoint && circle.dataset.id === micPoint.id ? micPoint : data.find(item => item.id === circle.dataset.id);
+      layer.querySelectorAll('.point').forEach(point => {
+        const d = point.dataset.average
+          ? averageData.find(item => item.id === point.dataset.id)
+          : micPoint && point.dataset.id === micPoint.id ? micPoint : data.find(item => item.id === point.dataset.id);
         if (!d) return;
-        circle.addEventListener('mouseenter', e => showTooltip(e, d));
-        circle.addEventListener('mousemove', e => moveTooltip(e));
-        circle.addEventListener('mouseleave', hideTooltip);
+        point.addEventListener('mouseenter', e => showTooltip(e, d));
+        point.addEventListener('mousemove', e => moveTooltip(e));
+        point.addEventListener('mouseleave', hideTooltip);
       });
       drawSpeakerShape();
       applyZoom();
