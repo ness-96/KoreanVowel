@@ -673,7 +673,7 @@
       if (!lineLayer) return;
       if (selectedSpeaker === 'all') {
         lineLayer.innerHTML = '';
-        summary.textContent = '화자 선택 메뉴에서 고르거나 분포도 점을 클릭하면 해당 화자의 모음 점을 순서대로 연결합니다.';
+        summary.textContent = '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과만 강조합니다.';
         return;
       }
       const speakerData = filteredData()
@@ -1108,6 +1108,7 @@
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
       selectedSpeaker = e.target.value;
+      selectedVowel = 'all';
       render();
     });
 
