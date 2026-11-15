@@ -411,6 +411,7 @@
 
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
+    const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
     const VOWEL_CARRIER_SENTENCES = {
       'ㅣ': '나는 “이다”라고 말합니다.',
@@ -604,16 +605,21 @@
         summary.textContent = '화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.';
         return;
       }
-      const speakerData = filteredData().filter(d => d.speakerId === selectedSpeaker).sort((a, b) => VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel));
+      const speakerData = filteredData()
+        .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
+        .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
       if (speakerData.length < 2) {
         lineLayer.innerHTML = '';
-        summary.textContent = `${selectedSpeaker}: 연결할 모음값이 2개 이상 필요합니다.`;
+        summary.textContent = `${selectedSpeaker}: 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.`;
         return;
       }
       const points = speakerData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
       const nodes = speakerData.map(d => `<circle class="speaker-node" cx="${xScale(d.f2)}" cy="${yScale(d.f1)}" r="5" />`).join('');
-      lineLayer.innerHTML = `<polyline class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
-      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 연결해 표시하고 있습니다.`;
+      const closesTriangle = speakerData.some(d => d.vowel === 'ㅣ') && speakerData.some(d => d.vowel === 'ㅜ');
+      const shapeTag = closesTriangle ? 'polygon' : 'polyline';
+      const closeNotice = closesTriangle ? ' ㅣ-ㅜ 선으로 닫힌 모음 삼각도입니다.' : ' ㅜ 입력 전에는 열린 순서선으로 표시합니다.';
+      lineLayer.innerHTML = `<${shapeTag} class="speaker-path" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(speakerData[0].f2)+10}" y="${yScale(speakerData[0].f1)-10}">${esc(selectedSpeaker)}</text>`;
+      summary.textContent = `${selectedSpeaker}: ${speakerData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ 순서로 연결합니다.${closeNotice}`;
     }
     function pointOpacity(d) {
       if (d.source === 'microphone') return 1;
