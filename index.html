@@ -703,6 +703,16 @@
       const lineLayer = document.getElementById('speakerLineLayer');
       const summary = document.getElementById('speakerShapeSummary');
       if (!lineLayer) return;
+      const makeShape = (items, label) => {
+        const points = items.map(d => String(xScale(d.f2)) + ',' + String(yScale(d.f1))).join(' ');
+        const nodes = items.map(d => '<text class="speaker-node" x="' + xScale(d.f2) + '" y="' + yScale(d.f1) + '" aria-label="' + esc(d.vowel) + '">' + esc(d.vowel) + '</text>').join('');
+        const closesTriangle = items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ');
+        const shapeTag = closesTriangle ? 'polygon' : 'polyline';
+        const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
+        const shapeColorClass = items[0].gender === 'female' ? ' female-shape' : items[0].gender === 'male' ? ' male-shape' : '';
+        const markup = '<' + shapeTag + ' class="speaker-path' + shapeColorClass + '" points="' + points + '" />' + nodes + '<text class="speaker-label" x="' + (xScale(items[0].f2) + 10) + '" y="' + (yScale(items[0].f1) - 10) + '">' + esc(label) + '</text>';
+        return { markup, count: items.length, closeNotice };
+      };
       let shapeData = [];
       let shapeLabel = '';
       if (selectedAverageSeries !== 'all') {
@@ -715,22 +725,44 @@
           .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
           .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
         shapeLabel = selectedSpeaker;
+      } else if (selectedAge === 'average' && selectedGender === 'all') {
+        const grouped = new Map();
+        filteredAverageData()
+          .filter(d => VOWEL_TRIANGLE_ORDER.includes(d.vowel))
+          .forEach(d => {
+            const key = averageSeriesKey(d);
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key).push(d);
+          });
+        const genderOrder = { male: 0, female: 1 };
+        const groups = [...grouped.values()]
+          .map(items => items.sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel)))
+          .filter(items => items.length >= 2)
+          .sort((a, b) => (genderOrder[a[0].gender] ?? 9) - (genderOrder[b[0].gender] ?? 9));
+        if (!groups.length) {
+          lineLayer.innerHTML = '';
+          summary.textContent = '남성·여성 평균의 모음값이 2개 이상 입력되면 두 모음 모양을 함께 표시합니다.';
+          return;
+        }
+        const renderedGroups = groups.map(items => makeShape(items, averageSeriesLabel(items[0])));
+        lineLayer.innerHTML = renderedGroups.map(item => item.markup).join('');
+        const labels = groups.map(items => averageSeriesLabel(items[0])).join(' · ');
+        const closeNotice = groups.every(items => items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ'))
+          ? ' ㅡ-ㅣ 선으로 각각 닫힌 모음 삼각도입니다.'
+          : ' 일부 평균은 ㅡ 입력 전까지 열린 순서선으로 표시됩니다.';
+        summary.textContent = labels + ': 각 평균의 전체 모음값을 동시에 연결합니다.' + closeNotice;
+        return;
       }
       if (shapeData.length < 2) {
         lineLayer.innerHTML = '';
         summary.textContent = selectedAverageSeries !== 'all' || selectedSpeaker !== 'all'
-          ? `${shapeLabel}: 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.`
+          ? (shapeLabel + ': 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.')
           : '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과를 강조하고 클릭한 화자 또는 평균 집단의 모음 모양을 연결합니다.';
         return;
       }
-      const points = shapeData.map(d => `${xScale(d.f2)},${yScale(d.f1)}`).join(' ');
-      const nodes = shapeData.map(d => `<text class="speaker-node" x="${xScale(d.f2)}" y="${yScale(d.f1)}" aria-label="${esc(d.vowel)}">${esc(d.vowel)}</text>`).join('');
-      const closesTriangle = shapeData.some(d => d.vowel === 'ㅣ') && shapeData.some(d => d.vowel === 'ㅡ');
-      const shapeTag = closesTriangle ? 'polygon' : 'polyline';
-      const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
-      const shapeColorClass = shapeData[0].gender === 'female' ? ' female-shape' : shapeData[0].gender === 'male' ? ' male-shape' : '';
-      lineLayer.innerHTML = `<${shapeTag} class="speaker-path${shapeColorClass}" points="${points}" />${nodes}<text class="speaker-label" x="${xScale(shapeData[0].f2)+10}" y="${yScale(shapeData[0].f1)-10}">${esc(shapeLabel)}</text>`;
-      summary.textContent = `${shapeLabel}: ${shapeData.length}개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.${closeNotice}`;
+      const rendered = makeShape(shapeData, shapeLabel);
+      lineLayer.innerHTML = rendered.markup;
+      summary.textContent = shapeLabel + ': ' + rendered.count + '개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.' + rendered.closeNotice;
     }
     function pointOpacity(d) {
       if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
@@ -1140,12 +1172,18 @@
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedGender = button.dataset.gender;
+      selectedAverageSeries = 'all';
+      selectedSpeaker = 'all';
+      selectedVowel = 'all';
       document.querySelectorAll('#genderFilter button').forEach(b => b.classList.toggle('active', b === button));
       render();
     });
     document.getElementById('ageFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedAge = button.dataset.age;
+      selectedAverageSeries = 'all';
+      selectedSpeaker = 'all';
+      selectedVowel = 'all';
       document.querySelectorAll('#ageFilter button').forEach(b => b.classList.toggle('active', b === button));
       render();
     });
