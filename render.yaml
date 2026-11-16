@@ -1,0 +1,26 @@
+services:
+  - type: web
+    runtime: docker
+    name: korean-vowel-formant-api
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://ness-96.github.io
+
+
+
+
+
+
+
+
+
+
+
+
+
