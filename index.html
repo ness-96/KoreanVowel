@@ -79,6 +79,10 @@
     .card-title { margin-top: 7px; font-size: 23px; letter-spacing: -.05em; }
     .card-description { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 680px; }
     .metric-box { min-width: 126px; padding: 12px 14px; border-radius: 14px; background: #f7f9fc; text-align: right; }
+    .summary-box { min-width: 340px; text-align: left; }
+    .summary-box .mini-stats { margin-top: 8px; gap: 5px; }
+    .summary-box .mini-stat { padding: 8px 5px; }
+    .summary-box .mini-stat strong { font-size: 15px; }
     .metric-label { color: var(--muted); font-size: 11px; }
     .metric-value { margin-top: 3px; font-size: 22px; font-weight: 800; color: var(--navy); }
 
@@ -198,8 +202,6 @@
     .mic-live-indicator.on { color: #247a50; background: #eaf8f0; }
 
     .mic-status { margin-top: 10px; color: #60718a; font-size: 11px; line-height: 1.5; }
-    .mic-result { margin-top: 8px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #53657e; font-size: 11px; line-height: 1.55; }
-    .mic-result strong { color: #315fc4; }
     .mic-formant-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
     .mic-formant-value { padding: 10px 12px; border: 1px solid #edf0f4; border-radius: 10px; background: #f7f9fc; }
     .mic-formant-value span { display: block; color: #718096; font-size: 10px; font-weight: 800; }
@@ -242,8 +244,8 @@
       .brand-sub { display: none; }
       .layout { padding: 16px 12px 28px; }
       .sidebar { display: flex; }
-      .card-head { padding: 19px 18px 12px; }
-      .metric-box { display: none; }
+      .card-head { padding: 19px 18px 12px; flex-direction: column; }
+      .metric-box { display: block; width: 100%; min-width: 0; }
       .chart-wrap { margin: 0 6px; min-height: 500px; }
       #chart { height: 500px; }
       .batch-input-grid { gap: 7px; }
@@ -277,9 +279,14 @@
             <h1 class="card-title">한국인 화자 F1·F2 모음 분포</h1>
             <p class="card-description">모음 문자에 커서를 올리면 화자 정보가 표시됩니다. 오른쪽 패널에서 성별과 연령대를 선택하고, 휠로 공간을 확대·축소해 보세요.</p>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">현재 표시 모음</div>
-            <div class="metric-value" id="pointCount">0</div>
+          <div class="metric-box summary-box">
+            <div class="metric-label">현재 데이터 요약</div>
+            <div class="mini-stats">
+              <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
+              <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
+              <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
+              <div class="mini-stat"><strong id="averageCount">0</strong><span>평균값</span></div>
+            </div>
           </div>
         </div>
 
@@ -335,7 +342,6 @@
             <button class="age-button" data-age="60대">60대</button>
             <button class="age-button" data-age="70대">70대</button>
           </div>
-          <div class="filter-summary" id="filterSummary">전체 성별 · 전체 연령대가 표시되고 있습니다.</div>
           <span class="section-label">화자 모음 모양</span>
           <select class="speaker-select" id="speakerShapeSelect">
             <option value="all">화자 선택</option>
@@ -365,7 +371,6 @@
           </div>
           <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
           <div class="mic-status" id="micStatus">마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.</div>
-          <div class="mic-result" id="micResult">음성 구간을 서버의 Praat/Parselmouth로 분석합니다.</div>
           <div class="mic-formant-readout" id="micFormantReadout" aria-live="polite">
             <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
             <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
@@ -445,20 +450,6 @@
           <button class="secondary-button danger-button" type="button" id="deleteAverageBtn">선택 평균값 삭제</button>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">현재 데이터 요약</div>
-              <div class="panel-caption">필터 적용 전 전체 데이터 기준</div>
-            </div>
-          </div>
-          <div class="mini-stats">
-            <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
-            <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
-            <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
-            <div class="mini-stat"><strong id="averageCount">0</strong><span>평균값</span></div>
-          </div>
-        </section>
       </aside>
     </main>
   </div>
@@ -926,7 +917,6 @@
       drawSpeakerShape();
       applyZoom();
       updateStats(visible.length, visibleAverages.length);
-      updateSummary(visible.length, visibleAverages.length);
     }
     function applyZoom() {
       plotContent.removeAttribute('transform');
@@ -959,20 +949,12 @@
     }
     function hideTooltip() { tooltip.classList.add('hidden'); }
     function updateStats(visibleCount, visibleAverageCount) {
-      document.getElementById('pointCount').textContent = visibleCount + visibleAverageCount;
       document.getElementById('recordCount').textContent = data.length;
       document.getElementById('speakerCount').textContent = new Set(data.map(d => d.speakerId)).size;
       document.getElementById('vowelCount').textContent = new Set(data.map(d => d.vowel)).size;
       document.getElementById('averageCount').textContent = averageData.length;
       document.getElementById('dataStatus').textContent = `${data.length}개 토큰 · ${new Set(data.map(d => d.speakerId)).size}명 · 평균 ${averageData.length}개`;
     }
-    function updateSummary(visibleCount, visibleAverageCount) {
-      const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
-      const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
-      const vowelFocus = selectedVowel === 'all' ? '' : ` · ${selectedVowel} 모음 강조` ;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 토큰 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 초록색 모음 문자는 내 발음(Praat 서버)입니다.' : ''}`;
-    }
-
     function updateMicPrompt() {
       const vowel = document.getElementById('micVowel').value;
       const syllable = VOWEL_SYLLABLES[vowel] || vowel;
@@ -1315,10 +1297,7 @@
         drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
         if (micSpectrumNote) micSpectrumNote.textContent = '파란 면적: 실시간 녹음 FFT · 초록 세로선: 서버 Praat/Parselmouth F1·F2';
         micPoint = { id: 'mic-live', speakerId: '내 발음', region: 'Praat 서버 연속 분석', nationality: '내 발음', gender: 'microphone', age: '실시간', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
-        const interval = payload.measurementInterval ? '<br>최근 측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
-        const warning = payload.quality && payload.quality.ceilingSpread && payload.quality.ceilingSpread.warning ? '<br><strong>주의</strong> ' + esc(payload.quality.ceilingSpread.warning) : '';
-        document.getElementById('micStatus').textContent = '마이크가 켜져 있습니다. 안정 구간을 찾을 때마다 서버값을 갱신합니다.';
-        document.getElementById('micResult').innerHTML = '<strong>Praat 서버값 갱신</strong><br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + warning;
+         document.getElementById('micStatus').textContent = '마이크가 켜져 있습니다. 안정 구간을 계속 분석합니다.';
         render();
       } catch (error) {
         if (timeoutId) clearTimeout(timeoutId);
@@ -1328,8 +1307,7 @@
           document.getElementById('micStatus').textContent = '마지막 안정값을 유지하고 새 안정 구간을 기다리는 중입니다.';
         } else {
           setMicFormantReadout(null);
-          document.getElementById('micStatus').textContent = '안정적인 F1·F2 구간을 기다리는 중입니다.';
-          document.getElementById('micResult').innerHTML = '<strong>아직 표시하지 않음</strong><br>' + esc(micLastLiveError);
+          document.getElementById('micStatus').textContent = '안정적인 F1·F2 구간을 기다리는 중입니다. ' + micLastLiveError;
         }
         render();
       } finally {
@@ -1411,9 +1389,8 @@
         setMicFormantReadout(null);
         drawMicSpectrum(null, null);
         if (micSpectrumNote) micSpectrumNote.textContent = '실시간 녹음 스펙트럼입니다. 안정적인 서버 F1·F2가 생기면 초록 세로선이 표시됩니다.';
-        document.getElementById('micResult').textContent = '연속 분석 대기 중입니다. 선택한 모음을 일정하게 발음하세요.';
         updateContinuousMicUi(true);
-        status.textContent = '마이크가 켜졌습니다. 선택한 모음을 계속 발음하면 서버값을 갱신합니다.';
+         status.textContent = '마이크가 켜졌습니다. 선택한 모음을 계속 발음하면 안정적인 F1·F2를 표시합니다.';
         micAnimationFrame = requestAnimationFrame(monitorMic);
         micContinuousTimer = setInterval(sendContinuousAnalysis, 800);
         render();
@@ -1430,7 +1407,6 @@
       releaseContinuousMicResources();
       updateContinuousMicUi(false);
       document.getElementById('micStatus').textContent = '마이크가 일시정지되었습니다. 다시 켜면 계속 분석합니다.';
-      document.getElementById('micResult').textContent = micServerFormants ? '마지막 Praat 서버값을 유지하고 있습니다.' : '분석값이 없습니다.';
       render();
     }
 
@@ -1449,7 +1425,6 @@
       drawMicSpectrum(micSpectrumSnapshot, null);
       if (micSpectrumNote) micSpectrumNote.textContent = micStream ? '새 표적 모음의 안정 구간을 기다리는 중입니다.' : '마이크를 켜면 실시간 스펙트럼과 서버 F1·F2가 표시됩니다.';
       document.getElementById('micStatus').textContent = micStream ? '마이크가 켜져 있습니다. 새로 선택한 모음을 일정하게 발음하세요.' : '마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.';
-      document.getElementById('micResult').textContent = micStream ? '새 표적 모음으로 연속 분석 대기 중입니다.' : '마이크를 켜면 Praat/Parselmouth 서버 분석을 시작합니다.';
       render();
     }
     document.getElementById('micVowel').addEventListener('change', resetMicAnalysisForVowelChange);
