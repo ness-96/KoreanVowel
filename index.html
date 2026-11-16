@@ -467,7 +467,7 @@
       'ㅜ': '나는 “우다”라고 말합니다.'
     };
     const VOWEL_STT_TARGETS = { 'ㅣ':'이다', 'ㅔ':'에다', 'ㅐ':'애다', 'ㅏ':'아다', 'ㅓ':'어다', 'ㅡ':'으다', 'ㅗ':'오다', 'ㅜ':'우다' };
-    const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || '';
+    const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || 'https://korean-vowel-formant-api.onrender.com';
     const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     const AVERAGE_STORAGE_KEY = 'vowel-space-prototype-v2-averages';
