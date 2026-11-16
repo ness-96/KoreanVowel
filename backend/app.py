@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import subprocess
 import tempfile
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +11,6 @@ import numpy as np
 import parselmouth
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from faster_whisper import WhisperModel
 
 app = FastAPI(title="Korean vowel formant analyzer", version="0.1.0")
 
@@ -25,29 +22,6 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["*"]
 )
-
-WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
-FORMANT_CEILING = float(os.getenv("FORMANT_CEILING", "5500"))
-_whisper_model: WhisperModel | None = None
-_whisper_model_lock = threading.Lock()
-
-
-def normalize_text(value: str) -> str:
-    return re.sub(r"[^0-9A-Za-z가-힣]", "", value or "").lower()
-
-
-def get_whisper_model() -> WhisperModel:
-    global _whisper_model
-    if _whisper_model is None:
-        with _whisper_model_lock:
-            if _whisper_model is None:
-                _whisper_model = WhisperModel(
-                    WHISPER_MODEL_NAME,
-                    device=os.getenv("WHISPER_DEVICE", "cpu"),
-                    compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-                )
-    return _whisper_model
-
 
 def convert_to_wav(input_path: Path, output_path: Path) -> None:
     ffmpeg = shutil.which("ffmpeg")
@@ -92,56 +66,6 @@ def has_voice_activity(wav_path: Path) -> bool:
         else:
             current_run = 0
     return active_frames >= 8 and longest_active_run >= 6
-
-
-def match_target_word_sequence(words: list[dict[str, Any]], target_norm: str) -> dict[str, Any] | None:
-    if not target_norm:
-        return None
-    for start_index in range(len(words)):
-        combined = ""
-        for end_index in range(start_index, min(len(words), start_index + 4)):
-            token = normalize_text(words[end_index]["text"])
-            if not token:
-                continue
-            combined += token
-            if combined == target_norm:
-                return {
-                    "text": " ".join(item["text"] for item in words[start_index:end_index + 1]),
-                    "start": float(words[start_index]["start"]),
-                    "end": float(words[end_index]["end"])
-                }
-            if len(combined) >= len(target_norm):
-                break
-    return None
-
-
-def transcribe_target(wav_path: Path, target_word: str) -> dict[str, Any]:
-    model = get_whisper_model()
-    segments, _info = model.transcribe(
-        str(wav_path),
-        language="ko",
-        word_timestamps=True,
-        vad_filter=True,
-        beam_size=1,
-        condition_on_previous_text=False,
-        temperature=0.0
-    )
-    segments = list(segments)
-    transcript = " ".join(segment.text.strip() for segment in segments).strip()
-    target_norm = normalize_text(target_word)
-    words: list[dict[str, Any]] = []
-    for segment in segments:
-        for word in (segment.words or []):
-            words.append({
-                "text": word.word.strip(),
-                "start": float(word.start),
-                "end": float(word.end)
-            })
-
-    matched = match_target_word_sequence(words, target_norm)
-    if matched:
-        return {"transcript": transcript, "targetMatched": True, "word": matched, "segments": segments}
-    return {"transcript": transcript, "targetMatched": False, "word": None, "segments": segments}
 
 
 def finite_formant(formant: parselmouth.Formant, number: int, time: float) -> float | None:
@@ -192,7 +116,7 @@ def find_longest_vowel_run(
         if len(run) >= 8 and run[-1]["time"] - run[0]["time"] >= 0.08
     ]
     if not qualified:
-        raise ValueError("목표 모음 구간에서 충분히 긴 유성·안정 포먼트 구간을 찾지 못했습니다.")
+        raise ValueError("고립 모음 녹음에서 충분히 긴 유성·안정 포먼트 구간을 찾지 못했습니다.")
     return max(qualified, key=lambda run: (run[-1]["time"] - run[0]["time"], len(run)))
 
 
@@ -223,7 +147,7 @@ def analyse_with_ceiling(
     return {
         "f1": round(median(f1_values), 1),
         "f2": round(median(f2_values), 1),
-        "method": "Praat Formant Burg via Parselmouth (target-word interval, central 20%)",
+        "method": "Praat Formant Burg via Parselmouth (isolated-vowel recording, central 20%)",
         "formantCeiling": maximum_formant,
         "vowelInterval": {"start": round(vowel_start, 4), "end": round(vowel_end, 4)},
         "measurementInterval": {"start": round(measurement_start, 4), "end": round(measurement_end, 4)},
@@ -232,17 +156,19 @@ def analyse_with_ceiling(
             "f1Iqr": round(f1_iqr, 1),
             "f2Iqr": round(f2_iqr, 1),
             "runDuration": round(duration, 4),
-            "segmentation": "longest voiced and formant-stable run within the STT target interval"
+            "segmentation": "longest voiced and formant-stable run in the isolated-vowel recording"
         }
     }
 
 
 def analyse_formants(
     wav_path: Path,
-    word_start: float,
-    word_end: float
+    word_start: float = 0.0,
+    word_end: float | None = None
 ) -> dict[str, Any]:
     sound = parselmouth.Sound(str(wav_path))
+    if word_end is None:
+        word_end = sound.duration
     candidates: list[dict[str, Any]] = []
     for ceiling in (5000.0, 5500.0, FORMANT_CEILING):
         if ceiling in {item.get("formantCeiling") for item in candidates}:
@@ -252,7 +178,7 @@ def analyse_formants(
         except ValueError:
             continue
     if not candidates:
-        raise ValueError("목표 모음의 안정적인 F1·F2 추적에 실패했습니다.")
+        raise ValueError("고립 모음의 안정적인 F1·F2 추적에 실패했습니다.")
 
     f1_spread = max(item["f1"] for item in candidates) - min(item["f1"] for item in candidates)
     f2_spread = max(item["f2"] for item in candidates) - min(item["f2"] for item in candidates)
@@ -276,17 +202,10 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "korean-vowel-formant-analyzer"}
 
 
-@app.get("/warmup")
-def warmup() -> dict[str, str]:
-    get_whisper_model()
-    return {"status": "ready", "model": WHISPER_MODEL_NAME}
-
-
 @app.post("/analyze")
 async def analyze(
     audio: UploadFile = File(...),
-    target_vowel: str = Form(...),
-    target_word: str = Form(...)
+    target_vowel: str = Form(...)
 ) -> dict[str, Any]:
     suffix = Path(audio.filename or "recording.webm").suffix or ".webm"
     try:
@@ -301,206 +220,15 @@ async def analyze(
                     "message": "음성 활동이 감지되지 않아 Praat/Parselmouth 분석을 실행하지 않았습니다.",
                     "reason": "no_voice_activity"
                 })
-            recognition = transcribe_target(wav_path, target_word)
-            if not recognition["targetMatched"] or not recognition["word"]:
-                raise HTTPException(status_code=422, detail={
-                    "message": "Whisper 전사에서 목표항목을 확인하지 못했습니다.",
-                    "transcript": recognition["transcript"],
-                    "targetWord": target_word
-                })
-            result = analyse_formants(
-                wav_path,
-                float(recognition["word"]["start"]),
-                float(recognition["word"]["end"])
-            )
+            result = analyse_formants(wav_path)
             return {
                 "ok": True,
                 "targetVowel": target_vowel,
-                "targetWord": target_word,
-                "transcript": recognition["transcript"],
-                "targetMatched": True,
                 **result
             }
     except HTTPException:
         raise
     except Exception as error:
         raise HTTPException(status_code=422, detail={"message": str(error)}) from error
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
