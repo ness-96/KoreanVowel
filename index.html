@@ -196,6 +196,17 @@
     .mic-status { margin-top: 10px; color: #60718a; font-size: 11px; line-height: 1.5; }
     .mic-result { margin-top: 8px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #53657e; font-size: 11px; line-height: 1.55; }
     .mic-result strong { color: #315fc4; }
+    .mic-formant-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+    .mic-formant-value { padding: 10px 12px; border: 1px solid #edf0f4; border-radius: 10px; background: #f7f9fc; }
+    .mic-formant-value span { display: block; color: #718096; font-size: 10px; font-weight: 800; }
+    .mic-formant-value strong { display: inline-block; margin-top: 3px; color: var(--navy); font-size: 20px; line-height: 1; }
+    .mic-formant-value small { margin-left: 3px; color: #8c98a8; font-size: 10px; }
+    .mic-spectrum-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .mic-spectrum-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: #65748a; font-size: 10px; font-weight: 800; }
+    .mic-spectrum-head span:last-child { color: #9aa6b6; font-weight: 600; text-align: right; }
+    #micSpectrum { display: block; width: 100%; height: 170px; border-radius: 8px; background: #fff; }
+    .mic-spectrum-note { margin-top: 6px; color: #8b97a7; font-size: 10px; line-height: 1.45; }
+
     .mini-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
     .mini-stat { padding: 11px 8px; border-radius: 10px; background: #f7f9fc; text-align: center; }
     .mini-stat strong { display: block; font-size: 17px; color: var(--navy); }
@@ -351,6 +362,16 @@
           <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
           <div class="mic-status" id="micStatus">선택한 모음만 0.5~1초 정도 안정적으로 발음하세요.</div>
           <div class="mic-result" id="micResult">녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.</div>
+          <div class="mic-formant-readout" id="micFormantReadout" aria-live="polite">
+            <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
+            <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
+          </div>
+          <div class="mic-spectrum-panel">
+            <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–5000 Hz</span></div>
+            <canvas id="micSpectrum" width="620" height="170" aria-label="녹음 주파수 스펙트럼"></canvas>
+            <div class="mic-spectrum-note" id="micSpectrumNote">녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.</div>
+          </div>
+
           <div class="mic-actions">
             <button class="submit-button" type="button" id="micStartBtn">모음 녹음 시작</button>
             <button class="secondary-button" type="button" id="micStopBtn" disabled>녹음 중지</button>
@@ -483,11 +504,17 @@
     let micFinishTimer = null;
     let micStopRequested = false;
     let micAnalysisSnapshot = null;
+    let micSpectrumSnapshot = null;
+    let micServerFormants = null;
     let pendingDeletion = null;
 
     const svg = document.getElementById('chart');
     const plotContent = document.getElementById('plotContent');
     const chartWrap = document.getElementById('chartWrap');
+    const micSpectrumCanvas = document.getElementById('micSpectrum');
+    const micSpectrumNote = document.getElementById('micSpectrumNote');
+    const micF1Value = document.getElementById('micF1Value');
+    const micF2Value = document.getElementById('micF2Value');
     const tooltip = document.getElementById('tooltip');
     const plot = { x: 78, y: 32, w: 748, h: 520 };
     const domain = { f2Min: 0, f2Max: 3000, f1Min: 0, f1Max: 1000 };
@@ -1012,6 +1039,140 @@
       return f1 && f2 ? { f1: Math.round(f1), f2: Math.round(f2), frameCount: estimates.length } : null;
     }
 
+
+    function setMicFormantReadout(formants) {
+      const f1 = Number(formants && formants.f1);
+      const f2 = Number(formants && formants.f2);
+      if (micF1Value) micF1Value.textContent = Number.isFinite(f1) ? f1.toFixed(1) : '—';
+      if (micF2Value) micF2Value.textContent = Number.isFinite(f2) ? f2.toFixed(1) : '—';
+    }
+
+    function drawMicSpectrum(snapshot = micSpectrumSnapshot, formants = micServerFormants) {
+      const canvas = micSpectrumCanvas;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(280, Math.round(rect.width || 520));
+      const height = 170;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      const pad = { top: 18, right: 12, bottom: 30, left: 38 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+      const dbMin = -100;
+      const dbMax = 0;
+      const sampleRate = Number(snapshot && snapshot.sampleRate) || 16000;
+      const nyquist = sampleRate / 2;
+      const maxFrequency = Math.min(5000, nyquist);
+      const frames = snapshot && Array.isArray(snapshot.frames)
+        ? snapshot.frames.filter(frame => frame && typeof frame.length === 'number' && frame.length > 0)
+        : [];
+      const xForFrequency = frequency => pad.left + (frequency / maxFrequency) * plotW;
+      const yForDb = db => pad.top + (1 - (Math.max(dbMin, Math.min(dbMax, db)) - dbMin) / (dbMax - dbMin)) * plotH;
+
+      ctx.font = '9px system-ui, sans-serif';
+      ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      for (let frequency = 0; frequency <= maxFrequency; frequency += 1000) {
+        const x = xForFrequency(frequency);
+        ctx.strokeStyle = '#edf0f4';
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.stroke();
+        ctx.fillStyle = '#8995a6';
+        ctx.fillText(String(frequency), x, height - 11);
+      }
+      ctx.textAlign = 'right';
+      for (let db = -80; db <= 0; db += 20) {
+        const y = yForDb(db);
+        ctx.strokeStyle = '#f1f3f6';
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillStyle = '#a0a9b6';
+        ctx.fillText(String(db), pad.left - 5, y + 3);
+      }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#7d8999';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText('Frequency (Hz)', pad.left + plotW / 2, height - 1);
+
+      if (!frames.length) {
+        ctx.fillStyle = '#9aa6b6';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillText('녹음된 주파수 자료가 없습니다.', width / 2, pad.top + plotH / 2);
+        return;
+      }
+
+      const binCount = frames.reduce((maximum, frame) => Math.max(maximum, frame.length), 0);
+      const sampledFrames = frames.length > 60
+        ? frames.filter((frame, index) => index % Math.ceil(frames.length / 60) === 0)
+        : frames;
+      const aggregate = new Float32Array(binCount);
+      for (let bin = 0; bin < binCount; bin += 1) {
+        const values = [];
+        sampledFrames.forEach(frame => {
+          const value = Number(frame[bin]);
+          if (Number.isFinite(value)) values.push(value);
+        });
+        if (!values.length) { aggregate[bin] = dbMin; continue; }
+        values.sort((a, b) => a - b);
+        aggregate[bin] = values[Math.floor(values.length / 2)];
+      }
+      const maxBin = Math.min(binCount - 1, Math.floor((maxFrequency / nyquist) * binCount));
+      const points = [];
+      for (let bin = 0; bin <= maxBin; bin += 1) {
+        const frequency = (bin / binCount) * nyquist;
+        const left = aggregate[Math.max(0, bin - 1)];
+        const middle = aggregate[bin];
+        const right = aggregate[Math.min(maxBin, bin + 1)];
+        const db = (left + middle + right) / 3;
+        points.push({ x: xForFrequency(frequency), y: yForDb(db) });
+      }
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, pad.top + plotH);
+      points.forEach(point => ctx.lineTo(point.x, point.y));
+      ctx.lineTo(points[points.length - 1].x, pad.top + plotH);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(78, 124, 243, .13)';
+      ctx.fill();
+      ctx.beginPath();
+      points.forEach((point, index) => index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y));
+      ctx.strokeStyle = 'rgba(78, 124, 243, .86)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const markers = [
+        { label: 'F1', frequency: Number(formants && formants.f1) },
+        { label: 'F2', frequency: Number(formants && formants.f2) }
+      ].filter(marker => Number.isFinite(marker.frequency) && marker.frequency > 0 && marker.frequency <= maxFrequency);
+      markers.forEach(marker => {
+        const x = xForFrequency(marker.frequency);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.strokeStyle = '#2f9d68';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#2f9d68';
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.fillText(marker.label, x, 10);
+        ctx.font = '9px system-ui, sans-serif';
+        ctx.fillText(Math.round(marker.frequency) + ' Hz', x, 21);
+      });
+    }
+
     function monitorMic(timestamp) {
       if (!micAnalyser) return;
       if (timestamp - micLastSampleAt >= 100) {
@@ -1043,6 +1204,11 @@
       if (!micAnalysisSnapshot) return;
       if (micFinishTimer) { clearTimeout(micFinishTimer); micFinishTimer = null; }
       const analysis = micAnalysisSnapshot;
+      micSpectrumSnapshot = analysis;
+      micServerFormants = null;
+      setMicFormantReadout(null);
+      drawMicSpectrum(micSpectrumSnapshot, null);
+      if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼입니다. 안정적인 서버 F1·F2가 없으면 세로선을 표시하지 않습니다.';
       micAnalysisSnapshot = null;
       const vowel = document.getElementById('micVowel').value;
       const activityLevels = Array.isArray(analysis.activity) ? analysis.activity.map(item => Number(item.rmsDb)).filter(Number.isFinite) : [];
@@ -1065,6 +1231,10 @@
       }
       if (!voiceActivity) {
         micPoint = null;
+        micServerFormants = null;
+        setMicFormantReadout(null);
+        drawMicSpectrum(micSpectrumSnapshot, null);
+        if (micSpectrumNote) micSpectrumNote.textContent = '음성 활동이 없어 서버 F1·F2 세로선을 표시하지 않았습니다.';
         document.getElementById('micStatus').textContent = '음성 활동이 감지되지 않아 분석하지 않았습니다.';
         document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>발음이 감지되지 않았습니다. 선택한 모음을 실제로 발음한 뒤 다시 시도해 주세요.';
         render();
@@ -1073,6 +1243,10 @@
       const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
       if (!useServer) {
         micPoint = null;
+        micServerFormants = null;
+        setMicFormantReadout(null);
+        drawMicSpectrum(micSpectrumSnapshot, null);
+        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼은 표시하지만 서버 F1·F2는 표시하지 않습니다.';
         document.getElementById('micStatus').textContent = 'Praat 서버를 사용할 수 없어 결과를 표시하지 않았습니다.';
         document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>연구용 결과는 Praat/Parselmouth 서버 분석이 확인된 경우에만 표시합니다.';
         render();
@@ -1097,6 +1271,10 @@
           const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
           throw new Error(detail || payload.message || 'Praat 서버 분석에 실패했습니다.');
         }
+        micServerFormants = { f1: payload.f1, f2: payload.f2 };
+        setMicFormantReadout(micServerFormants);
+        drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
+        if (micSpectrumNote) micSpectrumNote.textContent = '파란 면적: 녹음 FFT 스펙트럼 · 초록 세로선: 서버 Praat/Parselmouth F1·F2';
         micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
         const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
         const ceiling = payload.formantCeiling ? '<br>Formant ceiling: ' + Number(payload.formantCeiling).toFixed(0) + ' Hz' : '';
@@ -1108,6 +1286,10 @@
       } catch (error) {
         if (timeoutId) clearTimeout(timeoutId);
         micPoint = null;
+        micServerFormants = null;
+        setMicFormantReadout(null);
+        drawMicSpectrum(micSpectrumSnapshot, null);
+        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼은 표시하지만 안정적인 서버 F1·F2는 표시하지 않습니다.';
         const message = error && error.name === 'AbortError' ? '서버 분석이 30초 안에 끝나지 않았습니다.' : (error.message || 'Praat 서버 분석에 실패했습니다.');
         document.getElementById('micStatus').textContent = 'Praat 서버 분석이 불안정해 결과를 표시하지 않았습니다.';
         document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(message) + '<br>모음을 더 길고 일정하게 발음한 뒤 다시 시도해 주세요.';
@@ -1155,9 +1337,14 @@
         silentOutput.gain.value = 0;
         micAnalyser.connect(silentOutput).connect(micAudioContext.destination);
         micSpectrumFrames = [];
+        micSpectrumSnapshot = null;
+        micServerFormants = null;
         micActivityLevels = [];
         micLastSampleAt = 0;
         micPoint = null;
+        setMicFormantReadout(null);
+        drawMicSpectrum(null, null);
+        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.';
         document.getElementById('micResult').textContent = '녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.';
         render();
         startButton.disabled = true;
@@ -1202,6 +1389,11 @@
       if (micStream) return;
       micPoint = null;
       micAnalysisSnapshot = null;
+      micSpectrumSnapshot = null;
+      micServerFormants = null;
+      setMicFormantReadout(null);
+      drawMicSpectrum(null, null);
+      if (micSpectrumNote) micSpectrumNote.textContent = '녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.';
       document.getElementById('micStatus').textContent = '선택한 모음만 0.5~1초 정도 안정적으로 발음하세요.';
       document.getElementById('micResult').textContent = '녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.';
       render();
@@ -1211,6 +1403,7 @@
     document.getElementById('age').addEventListener('change', updateInputMode);
     document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
     document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
+    window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedGender = button.dataset.gender;
