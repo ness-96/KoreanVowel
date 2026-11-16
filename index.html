@@ -940,20 +940,69 @@
     function estimateMicFormants(frames, sampleRate, fftSize) {
       if (frames.length < 3) return null;
       const binCount = frames[0].length;
-      const average = new Float32Array(binCount);
-      frames.forEach(frame => frame.forEach((value, index) => { average[index] += value; }));
-      const peakInRange = (minHz, maxHz) => {
-        const start = Math.max(1, Math.floor(minHz * fftSize / sampleRate));
-        const end = Math.min(binCount - 1, Math.ceil(maxHz * fftSize / sampleRate));
-        let bestIndex = -1; let bestValue = -Infinity;
-        for (let index = start; index <= end; index += 1) {
-          if (average[index] > bestValue) { bestValue = average[index]; bestIndex = index; }
-        }
-        return bestIndex < 0 ? null : Math.round(bestIndex * sampleRate / fftSize);
+      const halfWidth = Math.max(3, Math.round((90 * fftSize) / sampleRate));
+      const median = values => {
+        const sorted = [...values].sort((a, b) => a - b);
+        if (!sorted.length) return null;
+        const middle = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
       };
-      const f1 = peakInRange(250, 1000);
-      const f2 = peakInRange(700, 3000);
-      return f1 && f2 ? { f1, f2 } : null;
+      const robustMedian = values => {
+        if (values.length < 3) return median(values);
+        const sorted = [...values].sort((a, b) => a - b);
+        const q1 = sorted[Math.floor((sorted.length - 1) * 0.25)];
+        const q3 = sorted[Math.floor((sorted.length - 1) * 0.75)];
+        const iqr = q3 - q1;
+        const filtered = iqr > 0 ? sorted.filter(value => value >= q1 - iqr * 1.5 && value <= q3 + iqr * 1.5) : sorted;
+        return median(filtered);
+      };
+      const estimateFrame = frame => {
+        const spectrum = new Float64Array(binCount);
+        for (let index = 0; index < binCount; index += 1) {
+          const db = Number(frame[index]);
+          spectrum[index] = Number.isFinite(db) ? 10 ** (db / 20) : 0;
+        }
+        const smooth = new Float64Array(binCount);
+        for (let index = 1; index < binCount - 1; index += 1) {
+          let total = 0; let count = 0;
+          for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
+            const value = spectrum[index + offset];
+            if (value !== undefined && Number.isFinite(value)) { total += value; count += 1; }
+          }
+          smooth[index] = count ? total / count : 0;
+        }
+        const peakInRange = (minHz, maxHz) => {
+          const start = Math.max(2, Math.floor(minHz * fftSize / sampleRate));
+          const end = Math.min(binCount - 3, Math.ceil(maxHz * fftSize / sampleRate));
+          let bestIndex = -1; let bestScore = -Infinity;
+          for (let index = start; index <= end; index += 1) {
+            if (smooth[index] < smooth[index - 1] || smooth[index] < smooth[index + 1]) continue;
+            const shoulder = Math.max(smooth[Math.max(1, index - halfWidth)], smooth[Math.min(binCount - 2, index + halfWidth)]);
+            const score = smooth[index] + Math.max(0, smooth[index] - shoulder) * 0.8;
+            if (score > bestScore) { bestScore = score; bestIndex = index; }
+          }
+          if (bestIndex < 0) {
+            for (let index = start; index <= end; index += 1) {
+              if (smooth[index] > bestScore) { bestScore = smooth[index]; bestIndex = index; }
+            }
+          }
+          if (bestIndex < 1) return null;
+          const y1 = Math.log(Math.max(smooth[bestIndex - 1], 1e-9));
+          const y2 = Math.log(Math.max(smooth[bestIndex], 1e-9));
+          const y3 = Math.log(Math.max(smooth[bestIndex + 1], 1e-9));
+          const denominator = y1 - 2 * y2 + y3;
+          const offset = denominator ? Math.max(-0.5, Math.min(0.5, 0.5 * (y1 - y3) / denominator)) : 0;
+          return (bestIndex + offset) * sampleRate / fftSize;
+        };
+        const f1 = peakInRange(250, 1000);
+        const f2 = f1 ? peakInRange(Math.max(700, f1 + 180), 3200) : peakInRange(700, 3200);
+        return f1 && f2 && f2 > f1 ? { f1, f2 } : null;
+      };
+      const estimates = frames.map(estimateFrame).filter(Boolean);
+      if (estimates.length < 3) return null;
+      const f1 = robustMedian(estimates.map(item => item.f1));
+      const f2 = robustMedian(estimates.map(item => item.f2));
+      return f1 && f2 ? { f1: Math.round(f1), f2: Math.round(f2), frameCount: estimates.length } : null;
     }
 
     function monitorMic(timestamp) {
