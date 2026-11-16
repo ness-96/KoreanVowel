@@ -1065,7 +1065,20 @@
       const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
       const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
       const sttConfirmed = sttCandidates.length > 0 && sttMatchesTarget(sttCandidates, target);
-      const voiceActivity = Array.isArray(analysis.activity) && analysis.activity.filter(item => Number(item.rmsDb) > -50).length >= 3;
+      const activityLevels = Array.isArray(analysis.activity) ? analysis.activity.map(item => Number(item.rmsDb)).filter(Number.isFinite) : [];
+      let activeFrames = 0;
+      let longestActiveRun = 0;
+      let currentActiveRun = 0;
+      activityLevels.forEach(level => {
+        if (level > -50) {
+          activeFrames += 1;
+          currentActiveRun += 1;
+          longestActiveRun = Math.max(longestActiveRun, currentActiveRun);
+        } else {
+          currentActiveRun = 0;
+        }
+      });
+      const voiceActivity = activityLevels.length >= 10 && activeFrames >= 8 && longestActiveRun >= 6;
       let recordedAudio = null;
       if (FORMANT_API_URL && micRecordingPromise) {
         try { recordedAudio = await micRecordingPromise; } catch (error) {}
