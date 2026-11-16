@@ -1096,8 +1096,9 @@
         micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
         const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
         const ceiling = payload.formantCeiling ? '<br>Formant ceiling: ' + Number(payload.formantCeiling).toFixed(0) + ' Hz' : '';
-        document.getElementById('micStatus').textContent = 'Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + ceiling + '<br>측정: 고립 모음 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
+        const stabilityWarning = payload.quality && payload.quality.ceilingSpread && payload.quality.ceilingSpread.warning ? '<br><strong>주의</strong> ' + esc(payload.quality.ceilingSpread.warning) : '';
+        document.getElementById('micStatus').textContent = stabilityWarning ? 'Praat/Parselmouth 분석이 완료되었지만 수동 확인이 필요합니다.' : 'Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + ceiling + stabilityWarning + '<br>측정: 고립 모음 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
         render();
         return;
       } catch (error) {
@@ -1192,7 +1193,16 @@
       finishMicRecording();
     }
 
-    document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
+    function resetMicAnalysisForVowelChange() {
+      updateMicPrompt();
+      if (micStream) return;
+      micPoint = null;
+      micAnalysisSnapshot = null;
+      document.getElementById('micStatus').textContent = '선택한 모음만 0.5~1초 정도 안정적으로 발음하세요.';
+      document.getElementById('micResult').textContent = '녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.';
+      render();
+    }
+    document.getElementById('micVowel').addEventListener('change', resetMicAnalysisForVowelChange);
     document.getElementById('region').addEventListener('change', updateRegionField);
     document.getElementById('age').addEventListener('change', updateInputMode);
     document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
