@@ -158,9 +158,9 @@ def median(values: list[float]) -> float:
     return float(np.median(np.asarray(values, dtype=float)))
 
 
-def analyse_formants(wav_path: Path, word: dict[str, Any]) -> dict[str, Any]:
+def analyse_formants(wav_path: Path) -> dict[str, Any]:
     sound = parselmouth.Sound(str(wav_path))
-    run = find_first_vowel_run(sound, float(word["start"]), float(word["end"]))
+    run = find_first_vowel_run(sound, 0.0, sound.duration)
     vowel_start = run[0]["time"]
     vowel_end = run[-1]["time"] + 0.005
     duration = vowel_end - vowel_start
@@ -168,22 +168,21 @@ def analyse_formants(wav_path: Path, word: dict[str, Any]) -> dict[str, Any]:
     measurement_end = vowel_start + duration * 0.60
     selected = [item for item in run if measurement_start <= item["time"] <= measurement_end]
     if len(selected) < 2:
-        raise ValueError("중앙 20% 구간의 유효한 분석 프레임이 부족합니다.")
+        raise ValueError("모음 안정 구간의 중앙 20% 프레임이 부족합니다.")
 
     f1_values = [item["f1"] for item in selected]
     f2_values = [item["f2"] for item in selected]
     return {
         "f1": round(median(f1_values), 1),
         "f2": round(median(f2_values), 1),
-        "method": "Praat Formant Burg via Parselmouth",
-        "wordInterval": {"start": round(float(word["start"]), 4), "end": round(float(word["end"]), 4)},
+        "method": "Praat Formant Burg via Parselmouth (isolated vowel)",
         "vowelInterval": {"start": round(vowel_start, 4), "end": round(vowel_end, 4)},
         "measurementInterval": {"start": round(measurement_start, 4), "end": round(measurement_end, 4)},
         "frameCount": len(selected),
         "quality": {
             "f1Iqr": round(float(np.percentile(f1_values, 75) - np.percentile(f1_values, 25)), 1),
             "f2Iqr": round(float(np.percentile(f2_values, 75) - np.percentile(f2_values, 25)), 1),
-            "segmentation": "first voiced formant-stable run within target word"
+            "segmentation": "longest voiced and formant-stable run in the isolated-vowel recording"
         }
     }
 
@@ -220,7 +219,7 @@ async def analyze(
                     "transcript": recognition["transcript"],
                     "targetWord": target_word
                 })
-            result = analyse_formants(wav_path, recognition["word"])
+            result = analyse_formants(wav_path)
             return {
                 "ok": True,
                 "targetVowel": target_vowel,
