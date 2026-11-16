@@ -1088,7 +1088,7 @@
           micRecognitionCandidates = [...new Set([...micRecognitionCandidates, ...alternatives].filter(Boolean))];
           micRecognitionFinalCandidates = [...new Set([...micRecognitionFinalCandidates, ...finalAlternatives].filter(Boolean))];
           micRecognitionFinalTranscript = micRecognitionSegments.filter(Boolean).join(' ').trim() || finalTexts.join(' ').trim();
-          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || '';
+          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || 'https://korean-vowel-formant-api.onrender.com';
           if (micRecognitionTranscript) {
             document.getElementById('micResult').innerHTML = `<strong>STT 전사 중</strong><br>${esc(micRecognitionTranscript)}`;
           }
