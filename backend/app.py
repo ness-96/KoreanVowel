@@ -73,15 +73,25 @@ def has_voice_activity(wav_path: Path) -> bool:
         return False
     frame_length = max(1, int(sound.sampling_frequency * 0.025))
     hop_length = max(1, int(sound.sampling_frequency * 0.010))
+    pitch = sound.to_pitch(time_step=0.010, pitch_floor=70, pitch_ceiling=500)
     active_frames = 0
+    longest_active_run = 0
+    current_run = 0
     for start in range(0, max(1, len(samples) - frame_length + 1), hop_length):
         frame = samples[start:start + frame_length]
         if len(frame) < frame_length // 2:
             break
         rms = float(np.sqrt(np.mean(np.square(frame))))
-        if rms > 0.003:
+        center_time = (start + len(frame) / 2) / sound.sampling_frequency
+        f0 = float(pitch.get_value_at_time(center_time))
+        voiced = np.isfinite(f0) and 70 <= f0 <= 500
+        if rms > 0.0035 and voiced:
             active_frames += 1
-    return active_frames >= 3
+            current_run += 1
+            longest_active_run = max(longest_active_run, current_run)
+        else:
+            current_run = 0
+    return active_frames >= 8 and longest_active_run >= 6
 
 
 def match_target_word_sequence(words: list[dict[str, Any]], target_norm: str) -> dict[str, Any] | None:
@@ -315,7 +325,6 @@ async def analyze(
         raise
     except Exception as error:
         raise HTTPException(status_code=422, detail={"message": str(error)}) from error
-
 
 
 
