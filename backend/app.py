@@ -174,6 +174,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "korean-vowel-formant-analyzer"}
 
 
+@app.get("/warmup")
+def warmup() -> dict[str, str]:
+    get_whisper_model()
+    return {"status": "ready", "model": WHISPER_MODEL_NAME}
+
+
 @app.post("/analyze")
 async def analyze(
     audio: UploadFile = File(...),
