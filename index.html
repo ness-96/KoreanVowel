@@ -104,10 +104,10 @@
     .speaker-path.female-shape { stroke: var(--red); }
     .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 1px; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
-    .point.mic-point { fill: #315fc4; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
+    .point.mic-point { fill: #2f9d68; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
     .point.average-point { stroke: none; stroke-width: 0; stroke-dasharray: none; font-size: 11px; }
     .average-label { fill: #1f3150; font-size: 10px; font-weight: 800; pointer-events: none; }
-    .mic-label { fill: #315fc4; font-size: 11px; font-weight: 800; pointer-events: none; }
+    .mic-label { fill: #2f9d68; font-size: 11px; font-weight: 800; pointer-events: none; }
     .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
     .speaker-select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
     .danger-button { color: #c7464f; border-color: #f0c4c7; background: #fff8f8; }
@@ -133,7 +133,7 @@
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     .legend-dot.red { background: var(--red); }
     .legend-dot.male { background: #4e7cf3; }
-    .legend-dot.blue { background: #315fc4; }
+    .legend-dot.green { background: #2f9d68; }
     .legend-dot.average { background: #fff; border: 2px dashed #1f3150; }
     .status-pill { margin-left: auto; color: #4e6a92; background: #edf4ff; padding: 6px 9px; border-radius: 8px; }
 
@@ -288,7 +288,7 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot male"></span>남성</span>
-          <span class="legend-item"><span class="legend-dot blue"></span>내 발음(Praat 서버)</span>
+          <span class="legend-item"><span class="legend-dot green"></span>내 발음(Praat 서버)</span>
           <span class="legend-item"><span class="legend-dot average"></span>연령대·성별 평균</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
         </div>
@@ -842,13 +842,16 @@
         <div class="batch-input-card">
           <div class="batch-vowel-head"><strong>${vowel}</strong><span>${VOWEL_SYLLABLES[vowel]}</span></div>
           <div class="batch-formant-grid">
-            <label class="batch-formant-label">F1<input class="batch-formant-input" id="batch-f1-${vowel}" type="number" min="100" max="1500" step="0.1" placeholder="430" /></label>
-            <label class="batch-formant-label">F2<input class="batch-formant-input" id="batch-f2-${vowel}" type="number" min="400" max="3500" step="0.1" placeholder="1900" /></label>
+            <label class="batch-formant-label">F1<input class="batch-formant-input" id="${batchFieldId('f1', vowel)}" type="number" min="100" max="1500" step="0.1" placeholder="430" /></label>
+            <label class="batch-formant-label">F2<input class="batch-formant-input" id="${batchFieldId('f2', vowel)}" type="number" min="400" max="3500" step="0.1" placeholder="1900" /></label>
           </div>
         </div>`).join('');
     }
+    function batchFieldId(formant, vowel) {
+      return `batch-${formant}-${VOWELS.indexOf(vowel)}`;
+    }
     function getBatchFormantValue(vowel, formant) {
-      return document.getElementById(`batch-${formant}-${vowel}`).value.trim();
+      return document.getElementById(batchFieldId(formant, vowel)).value.trim();
     }
 
     function render() {
@@ -932,7 +935,7 @@
       const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
       const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
       const vowelFocus = selectedVowel === 'all' ? '' : ` · ${selectedVowel} 모음 강조` ;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 토큰 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음(Praat 서버)입니다.' : ''}`;
+      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 토큰 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 초록색 모음 문자는 내 발음(Praat 서버)입니다.' : ''}`;
     }
 
     function updateMicPrompt() {
