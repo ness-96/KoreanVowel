@@ -230,7 +230,7 @@ def analyse_formants(
         except ValueError:
             continue
     if not candidates:
-        raise ValueError("고립 모음의 안정적인 F1·F2 추적에 실패했습니다.")
+        raise ValueError("모든 Formant ceiling에서 연속적으로 안정된 F1·F2 추적을 찾지 못했습니다. 모음을 더 길고 일정하게 발음해 다시 녹음해 주세요.")
 
     f1_spread = max(item["f1"] for item in candidates) - min(item["f1"] for item in candidates)
     f2_spread = max(item["f2"] for item in candidates) - min(item["f2"] for item in candidates)
