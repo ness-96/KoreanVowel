@@ -348,14 +348,14 @@
               <option value="ㅜ">ㅜ (우)</option>
             </select>
           </div>
-          <div class="mic-prompt" id="micPrompt">나는 “이다”라고 말합니다.</div>
-          <div class="mic-status" id="micStatus">문장을 읽으면 먼저 큰따옴표 안 단어의 STT 전사를 확인합니다.</div>
-          <div class="mic-result" id="micResult">STT 전사가 정확하면 F1·F2 분석 결과를 그래프에 표시합니다.</div>
+          <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
+          <div class="mic-status" id="micStatus">선택한 모음만 0.5~1초 정도 안정적으로 발음하세요. STT로 실제 발화를 확인합니다.</div>
+          <div class="mic-result" id="micResult">녹음 후 STT로 모음을 확인하고 Praat/Parselmouth로 F1·F2를 분석합니다.</div>
           <div class="mic-actions">
-            <button class="submit-button" type="button" id="micStartBtn">마이크로 읽기</button>
+            <button class="submit-button" type="button" id="micStartBtn">모음 녹음 시작</button>
             <button class="secondary-button" type="button" id="micStopBtn" disabled>녹음 중지</button>
           </div>
-          <div class="data-note">HTTPS 환경과 마이크 권한이 필요합니다. analysisApi 주소가 연결되면 Whisper와 Praat/Parselmouth 서버 분석을 사용하고, 연결되지 않으면 브라우저 기반 간이 F1·F2 예비 추정을 사용합니다.</div>
+          <div class="data-note">HTTPS 환경과 마이크 권한이 필요합니다. Whisper는 선택한 모음 발화 확인에만 사용하고, F1·F2는 Praat/Parselmouth로 직접 분석합니다. STT가 목표 모음을 확인하지 못하면 F1·F2를 표시하지 않습니다.</div>
         </section>
 
         <section class="panel">
@@ -456,17 +456,7 @@
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
     const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ','ㅡ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
-    const VOWEL_CARRIER_SENTENCES = {
-      'ㅣ': '나는 “이다”라고 말합니다.',
-      'ㅔ': '나는 “에다”라고 말합니다.',
-      'ㅐ': '나는 “애다”라고 말합니다.',
-      'ㅏ': '나는 “아다”라고 말합니다.',
-      'ㅓ': '나는 “어다”라고 말합니다.',
-      'ㅡ': '나는 “으다”라고 말합니다.',
-      'ㅗ': '나는 “오다”라고 말합니다.',
-      'ㅜ': '나는 “우다”라고 말합니다.'
-    };
-    const VOWEL_STT_TARGETS = { 'ㅣ':'이다', 'ㅔ':'에다', 'ㅐ':'애다', 'ㅏ':'아다', 'ㅓ':'어다', 'ㅡ':'으다', 'ㅗ':'오다', 'ㅜ':'우다' };
+    const VOWEL_STT_TARGETS = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
     const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || 'https://korean-vowel-formant-api.onrender.com';
     const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
@@ -925,7 +915,8 @@
 
     function updateMicPrompt() {
       const vowel = document.getElementById('micVowel').value;
-      document.getElementById('micPrompt').textContent = VOWEL_CARRIER_SENTENCES[vowel];
+      const syllable = VOWEL_SYLLABLES[vowel] || vowel;
+      document.getElementById('micPrompt').textContent = String(vowel) + ' (' + String(syllable) + ')를 길게 발음하세요.';
     }
 
     function normalizeSttText(text) {
@@ -1032,21 +1023,17 @@
       micAnalysisSnapshot = null;
       const vowel = document.getElementById('micVowel').value;
       const target = VOWEL_STT_TARGETS[vowel];
+      const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
+      const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
+      const sttConfirmed = sttCandidates.length > 0 && sttMatchesTarget(sttCandidates, target);
       let recordedAudio = null;
       if (FORMANT_API_URL && micRecordingPromise) {
         try { recordedAudio = await micRecordingPromise; } catch (error) {}
       }
       const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
       const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
-      const showProvisional = useServer && estimate;
-      if (showProvisional) {
-        micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크 예비 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
-        document.getElementById('micStatus').textContent = '브라우저 예비값을 표시했습니다. 서버 정밀 분석 중입니다.';
-        document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>서버 정밀 분석 결과가 오면 교체합니다.<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
-        render();
-      }
       if (useServer) {
-        document.getElementById('micStatus').textContent = showProvisional ? '예비값 표시 후 Whisper·Praat 서버 정밀 분석 중입니다.' : 'Whisper와 Praat/Parselmouth 서버에서 분석 중입니다.';
+        document.getElementById('micStatus').textContent = sttConfirmed ? 'STT로 모음을 확인했습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.' : '서버에서 STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석 중입니다.';
         let timeoutId = null;
         try {
           const formData = new FormData();
@@ -1063,44 +1050,48 @@
             throw new Error(detail || payload.message || '서버 분석에 실패했습니다.');
           }
           micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
-          document.getElementById('micStatus').textContent = 'Whisper 전사와 Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
-          document.getElementById('micResult').innerHTML = '<strong>서버 분석 완료</strong><br>전사 결과: ' + esc(payload.transcript || target) + '<br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz<br>측정: 목표모음 추정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
+          const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
+          document.getElementById('micStatus').textContent = 'STT 확인과 Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
+          document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>전사 결과: ' + esc(payload.transcript || target) + '<br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + '<br>측정: 모음 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
           render();
           return;
         } catch (error) {
           if (timeoutId) clearTimeout(timeoutId);
-          if (showProvisional) {
-            const message = error && error.name === 'AbortError' ? '서버 정밀 분석이 30초 안에 끝나지 않았습니다.' : (error.message || '서버 분석에 연결할 수 없습니다.');
-            document.getElementById('micStatus').textContent = '서버 정밀 분석이 지연되어 브라우저 예비값을 유지합니다.';
-            document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>' + esc(message) + '<br>필요하면 잠시 후 다시 시도해 서버값을 확인할 수 있습니다.<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
+          if (!sttConfirmed) {
+            micPoint = null;
+            const message = error && error.name === 'AbortError' ? '서버 확인이 30초 안에 끝나지 않았습니다.' : (error.message || 'STT 또는 서버 분석에 실패했습니다.');
+            document.getElementById('micStatus').textContent = '표적 모음 발화를 확인하지 못해 F1·F2를 표시하지 않았습니다.';
+            document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(message) + '<br>“' + esc(target) + '” 모음만 길게 발음한 뒤 다시 시도해 주세요.';
             render();
             return;
           }
-          document.getElementById('micStatus').textContent = '서버 분석에 실패했습니다. 브라우저 예비 분석으로 전환합니다.';
-          document.getElementById('micResult').innerHTML = '<strong>서버 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
+          if (estimate) {
+            micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크 예비 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
+            document.getElementById('micStatus').textContent = '서버 Praat 분석에 실패해 브라우저 예비값을 표시합니다.';
+            document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>' + esc(error.message || '서버 분석에 연결할 수 없습니다.') + '<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
+            render();
+            return;
+          }
+          document.getElementById('micStatus').textContent = '서버 Praat 분석에 실패했습니다.';
+          document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
+          return;
         }
       }
-      const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
-      const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
-      if (!sttCandidates.length) {
-        document.getElementById('micStatus').textContent = 'STT 전사 결과를 받지 못했습니다. 문장을 조금 더 크게 읽고 다시 시도해 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>인식된 전사 결과가 없습니다. 마이크 권한과 입력 장치를 확인해 주세요.';
+      if (!sttConfirmed) {
+        micPoint = null;
+        document.getElementById('micStatus').textContent = '표적 모음 발화를 확인하지 못해 F1·F2를 표시하지 않았습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>STT에서 “' + esc(target) + '” 모음을 확인하지 못했습니다. 모음만 길게 발음한 뒤 다시 시도해 주세요.';
+        render();
         return;
       }
-      if (!sttMatchesTarget(sttCandidates, target)) {
-        document.getElementById('micStatus').textContent = '표적 단어가 정확히 전사되지 않았습니다. 운반 문장을 다시 읽어 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>전사 결과: ' + esc(micRecognitionTranscript) + '<br>큰따옴표 안의 “' + esc(target) + '”가 확인되지 않았습니다. 운반 문장을 다시 읽어 주세요.';
-        return;
-      }
-      document.getElementById('micStatus').textContent = 'STT 전사가 확인되었습니다. 브라우저 예비 F1·F2를 추정 중입니다.';
       if (!estimate) {
-        document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다. 조금 더 크게 다시 읽어 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>전사 결과: ' + esc(micRecognitionTranscript || target);
+        document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>모음을 충분히 길게 발음했는지 확인해 주세요.';
         return;
       }
       micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
-      document.getElementById('micStatus').textContent = '브라우저 예비 F1·F2 추정이 완료되었습니다. 그래프의 파란 점을 확인해 주세요.';
-      document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>전사 결과: ' + esc(micRecognitionTranscript || target) + '<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
+      document.getElementById('micStatus').textContent = '브라우저 예비 F1·F2 추정이 완료되었습니다.';
+      document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>STT 확인: “' + esc(target) + '”<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
       render();
     }
 
@@ -1156,7 +1147,7 @@
           micRecognitionCandidates = [...new Set([...micRecognitionCandidates, ...alternatives].filter(Boolean))];
           micRecognitionFinalCandidates = [...new Set([...micRecognitionFinalCandidates, ...finalAlternatives].filter(Boolean))];
           micRecognitionFinalTranscript = micRecognitionSegments.filter(Boolean).join(' ').trim() || finalTexts.join(' ').trim();
-          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || 'https://korean-vowel-formant-api.onrender.com';
+          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || '';
           if (micRecognitionTranscript) {
             document.getElementById('micResult').innerHTML = `<strong>STT 전사 중</strong><br>${esc(micRecognitionTranscript)}`;
           }
@@ -1214,11 +1205,11 @@
         micLastSampleAt = 0;
         if (micRecognition) micRecognition.start();
         micPoint = null;
-        document.getElementById('micResult').textContent = 'STT 전사를 확인한 뒤 F1·F2를 분석합니다.';
+        document.getElementById('micResult').textContent = 'STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석합니다.';
         render();
         startButton.disabled = true;
         stopButton.disabled = false;
-        status.textContent = '문장을 읽는 중입니다. 다 읽은 뒤 녹음 중지를 눌러 주세요.';
+        status.textContent = '선택한 모음만 길게 발음하세요. 다 발음한 뒤 녹음 중지를 눌러 주세요.';
         micAnimationFrame = requestAnimationFrame(monitorMic);
       } catch (error) {
         if (micRecognition) {
@@ -1253,7 +1244,7 @@
       micAnimationFrame = null;
       document.getElementById('micStartBtn').disabled = false;
       document.getElementById('micStopBtn').disabled = true;
-      document.getElementById('micStatus').textContent = 'STT 전사를 확인 중입니다.';
+      document.getElementById('micStatus').textContent = 'STT로 표적 모음 발화를 확인 중입니다.';
       if (!micRecognition) {
         finishMicRecording();
         return;
