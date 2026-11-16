@@ -162,6 +162,27 @@ def analyse_with_ceiling(
         selected.append({"time": time, "f1": f1, "f2": f2})
     if len(selected) < 3:
         raise ValueError("모음 안정 구간의 중앙 20%에서 유효한 F1·F2 프레임이 부족합니다.")
+    stable_runs: list[list[dict[str, float]]] = []
+    current_stable: list[dict[str, float]] = []
+    for item in selected:
+        if current_stable:
+            previous = current_stable[-1]
+            gap = item["time"] - previous["time"]
+            jump_f1 = abs(item["f1"] - previous["f1"])
+            jump_f2 = abs(item["f2"] - previous["f2"])
+            if gap > 0.015 or jump_f1 > 90 or jump_f2 > 180:
+                stable_runs.append(current_stable)
+                current_stable = []
+        current_stable.append(item)
+    if current_stable:
+        stable_runs.append(current_stable)
+    qualified_stable_runs = [
+        run for run in stable_runs
+        if len(run) >= 8 and run[-1]["time"] - run[0]["time"] >= 0.03
+    ]
+    if not qualified_stable_runs:
+        raise ValueError("공통 음성 구간에서 연속적으로 안정된 F1·F2 추적을 찾지 못했습니다. 모음을 더 길고 일정하게 발음한 뒤 다시 녹음해 주세요.")
+    selected = max(qualified_stable_runs, key=lambda run: (run[-1]["time"] - run[0]["time"], len(run)))
 
     f1_values = [item["f1"] for item in selected]
     f2_values = [item["f2"] for item in selected]
