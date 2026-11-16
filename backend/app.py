@@ -62,6 +62,28 @@ def convert_to_wav(input_path: Path, output_path: Path) -> None:
         raise RuntimeError(completed.stderr[-1000:] or "음성 파일 변환에 실패했습니다.")
 
 
+def has_voice_activity(wav_path: Path) -> bool:
+    sound = parselmouth.Sound(str(wav_path))
+    values = np.asarray(sound.values, dtype=float)
+    if values.size == 0:
+        return False
+    samples = values[0] if values.ndim > 1 else values
+    peak = float(np.max(np.abs(samples)))
+    if peak < 0.01:
+        return False
+    frame_length = max(1, int(sound.sampling_frequency * 0.025))
+    hop_length = max(1, int(sound.sampling_frequency * 0.010))
+    active_frames = 0
+    for start in range(0, max(1, len(samples) - frame_length + 1), hop_length):
+        frame = samples[start:start + frame_length]
+        if len(frame) < frame_length // 2:
+            break
+        rms = float(np.sqrt(np.mean(np.square(frame))))
+        if rms > 0.003:
+            active_frames += 1
+    return active_frames >= 3
+
+
 def match_target_word_sequence(words: list[dict[str, Any]], target_norm: str) -> dict[str, Any] | None:
     if not target_norm:
         return None
@@ -212,6 +234,11 @@ async def analyze(
             wav_path = root / "audio.wav"
             input_path.write_bytes(await audio.read())
             convert_to_wav(input_path, wav_path)
+            if not has_voice_activity(wav_path):
+                raise HTTPException(status_code=422, detail={
+                    "message": "음성 활동이 감지되지 않아 Praat/Parselmouth 분석을 실행하지 않았습니다.",
+                    "reason": "no_voice_activity"
+                })
             recognition = transcribe_target(wav_path, target_word)
             if not recognition["targetMatched"] or not recognition["word"]:
                 raise HTTPException(status_code=422, detail={
