@@ -190,6 +190,8 @@ def analyse_formants(
         candidates,
         key=lambda item: item["quality"]["f1Iqr"] + item["quality"]["f2Iqr"] * 0.25
     )
+    if selected["quality"]["f1Iqr"] > 90 or selected["quality"]["f2Iqr"] > 180:
+        raise ValueError("선택된 안정 구간에서도 포먼트 변동이 커 결과를 표시하지 않았습니다. 모음을 더 길고 일정하게 발음해 다시 시도해 주세요.")
     selected["quality"]["ceilingSpread"] = {
         "f1": round(f1_spread, 1),
         "f2": round(f2_spread, 1),
