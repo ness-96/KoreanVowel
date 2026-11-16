@@ -183,17 +183,17 @@ def analyse_formants(
 
     f1_spread = max(item["f1"] for item in candidates) - min(item["f1"] for item in candidates)
     f2_spread = max(item["f2"] for item in candidates) - min(item["f2"] for item in candidates)
+    ceiling_warning = None
     if f1_spread > 90 or f2_spread > 180:
-        raise ValueError(
-            "포먼트 추적이 불안정합니다. Formant ceiling에 따라 값이 크게 달라져 결과를 표시하지 않았습니다."
-        )
+        ceiling_warning = "Formant ceiling에 따라 값이 달라져 자동값을 수동 Praat 확인과 함께 사용해야 합니다."
     selected = min(
         candidates,
         key=lambda item: item["quality"]["f1Iqr"] + item["quality"]["f2Iqr"] * 0.25
     )
     selected["quality"]["ceilingSpread"] = {
         "f1": round(f1_spread, 1),
-        "f2": round(f2_spread, 1)
+        "f2": round(f2_spread, 1),
+        "warning": ceiling_warning
     }
     return selected
 
