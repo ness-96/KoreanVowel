@@ -380,7 +380,7 @@
             <button class="submit-button" type="button" id="micToggleBtn">마이크 켜기</button>
             <span class="mic-live-indicator" id="micLiveIndicator" aria-live="polite">꺼짐</span>
           </div>
-          <div class="data-note">마이크를 켜면 계속 듣습니다. 음성 구간을 약 2초마다 서버로 보내 Praat/Parselmouth F1·F2를 갱신하며, 일시정지하면 전송을 멈춥니다.</div>
+          <div class="data-note">마이크를 켜면 계속 듣습니다. 음성 구간을 약 1초마다 서버로 보내 Praat/Parselmouth F1·F2를 갱신하며, 일시정지하면 전송을 멈춥니다.</div>
         </section>
 
         <section class="panel">
@@ -1243,16 +1243,32 @@
 
     function getRecentMicPcmWindow(seconds = 1.8) {
       if (!micPcmSampleRate || micPcmSampleCount < Math.round(micPcmSampleRate * 0.8)) return null;
-      const targetLength = Math.min(micPcmSampleCount, Math.round(micPcmSampleRate * seconds));
-      const output = new Float32Array(targetLength);
-      let writeOffset = targetLength;
+      const availableLength = micPcmSampleCount;
+      const available = new Float32Array(availableLength);
+      let writeOffset = availableLength;
       for (let index = micPcmChunks.length - 1; index >= 0 && writeOffset > 0; index -= 1) {
         const chunk = micPcmChunks[index];
         const take = Math.min(writeOffset, chunk.length);
         writeOffset -= take;
-        output.set(chunk.subarray(chunk.length - take), writeOffset);
+        available.set(chunk.subarray(chunk.length - take), writeOffset);
       }
-      return writeOffset === 0 ? output : null;
+      if (writeOffset !== 0) return null;
+      const frameLength = Math.max(1, Math.round(micPcmSampleRate * 0.02));
+      const hopLength = Math.max(1, Math.round(frameLength / 2));
+      let lastActiveEnd = -1;
+      for (let start = 0; start + frameLength <= available.length; start += hopLength) {
+        let sumSquares = 0;
+        for (let index = start; index < start + frameLength; index += 1) sumSquares += available[index] * available[index];
+        const rms = Math.sqrt(sumSquares / frameLength);
+        if (rms > 0.0035) lastActiveEnd = start + frameLength;
+      }
+      if (lastActiveEnd < 0) return null;
+      const tailSamples = Math.round(micPcmSampleRate * 0.12);
+      const end = Math.min(available.length, lastActiveEnd + tailSamples);
+      const targetLength = Math.min(available.length, Math.round(micPcmSampleRate * seconds));
+      const start = Math.max(0, end - targetLength);
+      const output = available.slice(start, end);
+      return output.length >= Math.round(micPcmSampleRate * 0.25) ? output : null;
     }
 
     function updateContinuousMicUi(isOn) {
@@ -1269,8 +1285,6 @@
 
     async function sendContinuousAnalysis() {
       if (!micStream || micServerBusy || !FORMANT_API_URL || !micPcmSampleRate) return;
-      const recentActivity = micActivityLevels.slice(-20).some(item => Number(item.rmsDb) > -50);
-      if (!recentActivity) return;
       const samples = getRecentMicPcmWindow(1.8);
       if (!samples) return;
       const generation = micContinuousGeneration;
@@ -1401,7 +1415,7 @@
         updateContinuousMicUi(true);
         status.textContent = '마이크가 켜졌습니다. 선택한 모음을 계속 발음하면 서버값을 갱신합니다.';
         micAnimationFrame = requestAnimationFrame(monitorMic);
-        micContinuousTimer = setInterval(sendContinuousAnalysis, 2000);
+        micContinuousTimer = setInterval(sendContinuousAnalysis, 800);
         render();
       } catch (error) {
         releaseContinuousMicResources();
