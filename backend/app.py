@@ -178,6 +178,12 @@ def analyse_with_ceiling(
         "quality": {
             "f1Iqr": round(f1_iqr, 1),
             "f2Iqr": round(f2_iqr, 1),
+            "f1Range": [round(min(f1_values), 1), round(max(f1_values), 1)],
+            "f2Range": [round(min(f2_values), 1), round(max(f2_values), 1)],
+            "frames": [
+                {"time": round(item["time"], 4), "f1": round(item["f1"], 1), "f2": round(item["f2"], 1)}
+                for item in selected
+            ],
             "runDuration": round(duration, 4),
             "segmentation": "common longest voiced interval; formant candidates compared on the same central 20%"
         }
@@ -261,6 +267,11 @@ def analyse_formants(
             "f2": item["f2"],
             "f1Iqr": item["quality"]["f1Iqr"],
             "f2Iqr": item["quality"]["f2Iqr"],
+            "f1Range": item["quality"]["f1Range"],
+            "f2Range": item["quality"]["f2Range"],
+            "vowelInterval": item["vowelInterval"],
+            "measurementInterval": item["measurementInterval"],
+            "frameCount": item["frameCount"],
             "selected": item is selected
         }
         for item in candidates
