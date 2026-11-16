@@ -788,9 +788,9 @@
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
     function pointColorClass(d) {
+      if (d.source === 'microphone') return 'mic-point';
       if (selectedVowel !== 'all' && d.vowel !== selectedVowel) return 'muted-point';
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
-      if (d.source === 'microphone') return 'mic-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
     }
     function locationLabel(d) {
