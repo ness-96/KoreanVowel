@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,7 @@ app.add_middleware(
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 FORMANT_CEILING = float(os.getenv("FORMANT_CEILING", "5500"))
 _whisper_model: WhisperModel | None = None
+_whisper_model_lock = threading.Lock()
 
 
 def normalize_text(value: str) -> str:
@@ -37,11 +39,13 @@ def normalize_text(value: str) -> str:
 def get_whisper_model() -> WhisperModel:
     global _whisper_model
     if _whisper_model is None:
-        _whisper_model = WhisperModel(
-            WHISPER_MODEL_NAME,
-            device=os.getenv("WHISPER_DEVICE", "cpu"),
-            compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-        )
+        with _whisper_model_lock:
+            if _whisper_model is None:
+                _whisper_model = WhisperModel(
+                    WHISPER_MODEL_NAME,
+                    device=os.getenv("WHISPER_DEVICE", "cpu"),
+                    compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+                )
     return _whisper_model
 
 
@@ -65,7 +69,9 @@ def transcribe_target(wav_path: Path, target_word: str) -> dict[str, Any]:
         language="ko",
         word_timestamps=True,
         vad_filter=True,
-        beam_size=1
+        beam_size=1,
+        condition_on_previous_text=False,
+        temperature=0.0
     )
     segments = list(segments)
     transcript = " ".join(segment.text.strip() for segment in segments).strip()
