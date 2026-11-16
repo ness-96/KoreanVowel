@@ -476,6 +476,7 @@
     let micAnalyser = null;
     let micAnimationFrame = null;
     let micSpectrumFrames = [];
+    let micActivityLevels = [];
     let micLastSampleAt = 0;
     let micRecorder = null;
     let micChunks = [];
@@ -1034,7 +1035,14 @@
         micAnalyser.getFloatFrequencyData(frame);
         let peak = -Infinity;
         frame.forEach(value => { if (value > peak) peak = value; });
+        const waveform = new Float32Array(micAnalyser.fftSize);
+        micAnalyser.getFloatTimeDomainData(waveform);
+        let sumSquares = 0;
+        waveform.forEach(value => { sumSquares += value * value; });
+        const rms = Math.sqrt(sumSquares / Math.max(1, waveform.length));
+        const rmsDb = 20 * Math.log10(Math.max(rms, 1e-8));
         if (peak > -78) micSpectrumFrames.push(frame);
+        micActivityLevels.push({ timestamp, rmsDb });
         micLastSampleAt = timestamp;
       }
       micAnimationFrame = requestAnimationFrame(monitorMic);
@@ -1057,14 +1065,22 @@
       const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
       const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
       const sttConfirmed = sttCandidates.length > 0 && sttMatchesTarget(sttCandidates, target);
+      const voiceActivity = Array.isArray(analysis.activity) && analysis.activity.filter(item => Number(item.rmsDb) > -50).length >= 3;
       let recordedAudio = null;
       if (FORMANT_API_URL && micRecordingPromise) {
         try { recordedAudio = await micRecordingPromise; } catch (error) {}
       }
+      if (!voiceActivity) {
+        micPoint = null;
+        document.getElementById('micStatus').textContent = '음성 활동이 감지되지 않아 분석하지 않았습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>발음이 감지되지 않았습니다. 선택한 모음을 실제로 발음한 뒤 다시 시도해 주세요.';
+        render();
+        return;
+      }
       const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
       const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
       if (useServer) {
-        document.getElementById('micStatus').textContent = sttConfirmed ? 'STT로 모음을 확인했습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.' : '서버에서 STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석 중입니다.';
+        document.getElementById('micStatus').textContent = sttConfirmed ? 'STT로 모음을 확인했습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.' : '음성 활동을 감지했습니다. 서버 STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석 중입니다.';
         let timeoutId = null;
         try {
           const formData = new FormData();
@@ -1103,8 +1119,10 @@
             render();
             return;
           }
+          micPoint = null;
           document.getElementById('micStatus').textContent = '서버 Praat 분석에 실패했습니다.';
           document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
+          render();
           return;
         }
       }
@@ -1116,8 +1134,10 @@
         return;
       }
       if (!estimate) {
+        micPoint = null;
         document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다.';
         document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>모음을 충분히 길게 발음했는지 확인해 주세요.';
+        render();
         return;
       }
       micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
@@ -1233,6 +1253,7 @@
         silentOutput.gain.value = 0;
         micAnalyser.connect(silentOutput).connect(micAudioContext.destination);
         micSpectrumFrames = [];
+        micActivityLevels = [];
         micLastSampleAt = 0;
         if (micRecognition) micRecognition.start();
         micPoint = null;
@@ -1263,6 +1284,7 @@
       if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
       micAnalysisSnapshot = micAudioContext && micAnalyser ? {
         frames: micSpectrumFrames.slice(),
+        activity: micActivityLevels.slice(),
         sampleRate: micAudioContext.sampleRate,
         fftSize: micAnalyser.fftSize
       } : null;
