@@ -332,7 +332,7 @@
           <div class="panel-head">
             <div>
               <div class="panel-title">마이크 발음 분석</div>
-              <div class="panel-caption">표적 모음이 들어간 문장을 읽으면 내 발음의 위치를 분포도에 겹쳐 봅니다.</div>
+              <div class="panel-caption">선택한 모음만 발음하면 내 발음의 위치를 분포도에 겹쳐 봅니다.</div>
             </div>
           </div>
           <div class="field full">
@@ -1149,7 +1149,7 @@
           micRecognitionFinalTranscript = micRecognitionSegments.filter(Boolean).join(' ').trim() || finalTexts.join(' ').trim();
           micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || '';
           if (micRecognitionTranscript) {
-            document.getElementById('micResult').innerHTML = `<strong>STT 전사 중</strong><br>${esc(micRecognitionTranscript)}`;
+            document.getElementById('micResult').innerHTML = `<strong>모음 발화 인식 중</strong><br>${esc(micRecognitionTranscript)}`;
           }
         };
         recognition.onerror = event => {
