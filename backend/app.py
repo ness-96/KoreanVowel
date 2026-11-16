@@ -139,19 +139,26 @@ def finite_formant(formant: parselmouth.Formant, number: int, time: float) -> fl
     return value if np.isfinite(value) else None
 
 
-def find_first_vowel_run(sound: parselmouth.Sound, word_start: float, word_end: float) -> list[dict[str, float]]:
+def find_longest_vowel_run(
+    sound: parselmouth.Sound,
+    word_start: float,
+    word_end: float,
+    maximum_formant: float
+) -> list[dict[str, float]]:
     pitch = sound.to_pitch(time_step=0.005, pitch_floor=60, pitch_ceiling=500)
     formant = sound.to_formant_burg(
         time_step=0.005,
         max_number_of_formants=5,
-        maximum_formant=FORMANT_CEILING,
+        maximum_formant=maximum_formant,
         window_length=0.025,
         pre_emphasis_from=50
     )
-    times = np.arange(max(0.0, word_start), min(sound.duration, word_end), 0.005)
+    start = max(0.0, float(word_start) - 0.12)
+    end = min(sound.duration, float(word_end) + 0.12)
+    times = np.arange(start, end, 0.005)
     valid: list[dict[str, float]] = []
     for time in times:
-        f0 = float(pitch.get_value_at_time(time))
+        f0 = float(pitch.get_value_at_time(float(time)))
         f1 = finite_formant(formant, 1, float(time))
         f2 = finite_formant(formant, 2, float(time))
         if not np.isfinite(f0) or f0 <= 0 or f1 is None or f2 is None:
@@ -170,43 +177,88 @@ def find_first_vowel_run(sound: parselmouth.Sound, word_start: float, word_end: 
     if current:
         runs.append(current)
 
-    for run in runs:
-        if len(run) >= 4 and run[-1]["time"] - run[0]["time"] >= 0.04:
-            return run
-    raise ValueError("목표모음으로 추정할 안정적인 유성 구간을 찾지 못했습니다.")
+    qualified = [
+        run for run in runs
+        if len(run) >= 8 and run[-1]["time"] - run[0]["time"] >= 0.08
+    ]
+    if not qualified:
+        raise ValueError("목표 모음 구간에서 충분히 긴 유성·안정 포먼트 구간을 찾지 못했습니다.")
+    return max(qualified, key=lambda run: (run[-1]["time"] - run[0]["time"], len(run)))
 
 
 def median(values: list[float]) -> float:
     return float(np.median(np.asarray(values, dtype=float)))
 
 
-def analyse_formants(wav_path: Path) -> dict[str, Any]:
-    sound = parselmouth.Sound(str(wav_path))
-    run = find_first_vowel_run(sound, 0.0, sound.duration)
+def analyse_with_ceiling(
+    sound: parselmouth.Sound,
+    word_start: float,
+    word_end: float,
+    maximum_formant: float
+) -> dict[str, Any]:
+    run = find_longest_vowel_run(sound, word_start, word_end, maximum_formant)
     vowel_start = run[0]["time"]
     vowel_end = run[-1]["time"] + 0.005
     duration = vowel_end - vowel_start
     measurement_start = vowel_start + duration * 0.40
     measurement_end = vowel_start + duration * 0.60
     selected = [item for item in run if measurement_start <= item["time"] <= measurement_end]
-    if len(selected) < 2:
+    if len(selected) < 3:
         raise ValueError("모음 안정 구간의 중앙 20% 프레임이 부족합니다.")
 
     f1_values = [item["f1"] for item in selected]
     f2_values = [item["f2"] for item in selected]
+    f1_iqr = float(np.percentile(f1_values, 75) - np.percentile(f1_values, 25))
+    f2_iqr = float(np.percentile(f2_values, 75) - np.percentile(f2_values, 25))
     return {
         "f1": round(median(f1_values), 1),
         "f2": round(median(f2_values), 1),
-        "method": "Praat Formant Burg via Parselmouth (isolated vowel)",
+        "method": "Praat Formant Burg via Parselmouth (target-word interval, central 20%)",
+        "formantCeiling": maximum_formant,
         "vowelInterval": {"start": round(vowel_start, 4), "end": round(vowel_end, 4)},
         "measurementInterval": {"start": round(measurement_start, 4), "end": round(measurement_end, 4)},
         "frameCount": len(selected),
         "quality": {
-            "f1Iqr": round(float(np.percentile(f1_values, 75) - np.percentile(f1_values, 25)), 1),
-            "f2Iqr": round(float(np.percentile(f2_values, 75) - np.percentile(f2_values, 25)), 1),
-            "segmentation": "longest voiced and formant-stable run in the isolated-vowel recording"
+            "f1Iqr": round(f1_iqr, 1),
+            "f2Iqr": round(f2_iqr, 1),
+            "runDuration": round(duration, 4),
+            "segmentation": "longest voiced and formant-stable run within the STT target interval"
         }
     }
+
+
+def analyse_formants(
+    wav_path: Path,
+    word_start: float,
+    word_end: float
+) -> dict[str, Any]:
+    sound = parselmouth.Sound(str(wav_path))
+    candidates: list[dict[str, Any]] = []
+    for ceiling in (5000.0, 5500.0, FORMANT_CEILING):
+        if ceiling in {item.get("formantCeiling") for item in candidates}:
+            continue
+        try:
+            candidates.append(analyse_with_ceiling(sound, word_start, word_end, ceiling))
+        except ValueError:
+            continue
+    if not candidates:
+        raise ValueError("목표 모음의 안정적인 F1·F2 추적에 실패했습니다.")
+
+    f1_spread = max(item["f1"] for item in candidates) - min(item["f1"] for item in candidates)
+    f2_spread = max(item["f2"] for item in candidates) - min(item["f2"] for item in candidates)
+    if f1_spread > 90 or f2_spread > 180:
+        raise ValueError(
+            "포먼트 추적이 불안정합니다. Formant ceiling에 따라 값이 크게 달라져 결과를 표시하지 않았습니다."
+        )
+    selected = min(
+        candidates,
+        key=lambda item: item["quality"]["f1Iqr"] + item["quality"]["f2Iqr"] * 0.25
+    )
+    selected["quality"]["ceilingSpread"] = {
+        "f1": round(f1_spread, 1),
+        "f2": round(f2_spread, 1)
+    }
+    return selected
 
 
 @app.get("/health")
@@ -246,7 +298,11 @@ async def analyze(
                     "transcript": recognition["transcript"],
                     "targetWord": target_word
                 })
-            result = analyse_formants(wav_path)
+            result = analyse_formants(
+                wav_path,
+                float(recognition["word"]["start"]),
+                float(recognition["word"]["end"])
+            )
             return {
                 "ok": True,
                 "targetVowel": target_vowel,
