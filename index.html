@@ -988,14 +988,26 @@
         try { recordedAudio = await micRecordingPromise; } catch (error) {}
       }
       const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
+      const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
+      const showProvisional = useServer && estimate;
+      if (showProvisional) {
+        micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크 예비 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
+        document.getElementById('micStatus').textContent = '브라우저 예비값을 표시했습니다. 서버 정밀 분석 중입니다.';
+        document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>서버 정밀 분석 결과가 오면 교체합니다.<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
+        render();
+      }
       if (useServer) {
-        document.getElementById('micStatus').textContent = 'Whisper와 Praat/Parselmouth 서버에서 분석 중입니다.';
+        document.getElementById('micStatus').textContent = showProvisional ? '예비값 표시 후 Whisper·Praat 서버 정밀 분석 중입니다.' : 'Whisper와 Praat/Parselmouth 서버에서 분석 중입니다.';
+        let timeoutId = null;
         try {
           const formData = new FormData();
           formData.append('audio', recordedAudio, 'recording.webm');
           formData.append('target_vowel', vowel);
           formData.append('target_word', target);
-          const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData });
+          const controller = new AbortController();
+          timeoutId = setTimeout(() => controller.abort(), 30000);
+          const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
+          if (timeoutId) clearTimeout(timeoutId);
           const payload = await response.json();
           if (!response.ok || !payload.ok) {
             const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
@@ -1007,6 +1019,14 @@
           render();
           return;
         } catch (error) {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (showProvisional) {
+            const message = error && error.name === 'AbortError' ? '서버 정밀 분석이 30초 안에 끝나지 않았습니다.' : (error.message || '서버 분석에 연결할 수 없습니다.');
+            document.getElementById('micStatus').textContent = '서버 정밀 분석이 지연되어 브라우저 예비값을 유지합니다.';
+            document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>' + esc(message) + '<br>필요하면 잠시 후 다시 시도해 서버값을 확인할 수 있습니다.<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
+            render();
+            return;
+          }
           document.getElementById('micStatus').textContent = '서버 분석에 실패했습니다. 브라우저 예비 분석으로 전환합니다.';
           document.getElementById('micResult').innerHTML = '<strong>서버 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
         }
@@ -1024,7 +1044,6 @@
         return;
       }
       document.getElementById('micStatus').textContent = 'STT 전사가 확인되었습니다. 브라우저 예비 F1·F2를 추정 중입니다.';
-      const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
       if (!estimate) {
         document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다. 조금 더 크게 다시 읽어 주세요.';
         document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>전사 결과: ' + esc(micRecognitionTranscript || target);
