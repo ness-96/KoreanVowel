@@ -1038,7 +1038,7 @@
 
     async function startMicRecording() {
       if (micStream) return;
-      const status = document.getElementById('micStatus');
+      const status = document.getElementById('micStatus'); if (FORMANT_API_URL) fetch(FORMANT_API_URL.replace(/\/$/, '') + '/warmup', { method: 'GET', keepalive: true }).catch(() => {});
       const startButton = document.getElementById('micStartBtn');
       const stopButton = document.getElementById('micStopBtn');
       const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
