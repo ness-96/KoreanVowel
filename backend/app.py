@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -14,6 +15,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Korean vowel formant analyzer", version="0.1.0")
 FORMANT_CEILING = float(os.getenv("FORMANT_CEILING", "5500"))
+REFERENCE_TOLERANCE_HZ = 500.0
+DEFAULT_REFERENCE_AVERAGES = {
+    "ㅣ": {"female": {"f1": 360.0, "f2": 2442.0}, "male": {"f1": 236.0, "f2": 2183.0}},
+    "ㅔ": {"female": {"f1": 500.0, "f2": 2168.0}, "male": {"f1": 415.0, "f2": 1848.0}},
+    "ㅐ": {"female": {"f1": 500.0, "f2": 2168.0}, "male": {"f1": 415.0, "f2": 1848.0}},
+    "ㅏ": {"female": {"f1": 825.0, "f2": 1688.0}, "male": {"f1": 651.0, "f2": 1156.0}},
+    "ㅓ": {"female": {"f1": 595.0, "f2": 1286.0}, "male": {"f1": 445.0, "f2": 845.0}},
+    "ㅡ": {"female": {"f1": 410.0, "f2": 1706.0}, "male": {"f1": 317.0, "f2": 1218.0}},
+    "ㅗ": {"female": {"f1": 450.0, "f2": 1103.0}, "male": {"f1": 320.0, "f2": 587.0}},
+    "ㅜ": {"female": {"f1": 357.0, "f2": 1203.0}, "male": {"f1": 324.0, "f2": 595.0}}
+}
 
 origins = [item.strip() for item in os.getenv("CORS_ORIGINS", "*").split(",") if item.strip()]
 app.add_middleware(
@@ -164,6 +176,8 @@ def analyse_with_ceiling(
 
 def analyse_formants(
     wav_path: Path,
+    target_vowel: str,
+    reference_averages: list[dict[str, Any]] | None = None,
     word_start: float = 0.0,
     word_end: float | None = None
 ) -> dict[str, Any]:
@@ -183,19 +197,52 @@ def analyse_formants(
 
     f1_spread = max(item["f1"] for item in candidates) - min(item["f1"] for item in candidates)
     f2_spread = max(item["f2"] for item in candidates) - min(item["f2"] for item in candidates)
-    if f1_spread > 90 or f2_spread > 180:
-        raise ValueError("Formant ceiling별 F1·F2 값 차이가 커 결과를 표시하지 않았습니다. 모음을 더 길고 일정하게 발음한 뒤 다시 녹음해 주세요.")
-    ceiling_warning = None
+    configured_refs = reference_averages or []
+    if not configured_refs:
+        configured_refs = [
+            {"gender": gender, "vowel": target_vowel, **values}
+            for gender, values in DEFAULT_REFERENCE_AVERAGES.get(target_vowel, {}).items()
+        ]
+    vowel_refs = [
+        ref for ref in configured_refs
+        if ref.get("vowel") == target_vowel
+        and ref.get("gender") in {"female", "male"}
+        and np.isfinite(float(ref.get("f1", float("nan"))))
+        and np.isfinite(float(ref.get("f2", float("nan"))))
+    ]
+    reference_matches: dict[int, list[dict[str, Any]]] = {}
+    for item in candidates:
+        reference_matches[id(item)] = [
+            ref for ref in vowel_refs
+            if abs(item["f1"] - float(ref["f1"])) <= REFERENCE_TOLERANCE_HZ
+            and abs(item["f2"] - float(ref["f2"])) <= REFERENCE_TOLERANCE_HZ
+        ]
+    reference_candidates = [item for item in candidates if reference_matches[id(item)]]
+    if not reference_candidates:
+        raise ValueError("측정값이 남성·여성 평균값에서 F1·F2 각각 ±500 Hz 범위를 벗어났습니다. 모음을 더 길고 일정하게 발음한 뒤 다시 녹음해 주세요.")
     selected = min(
-        candidates,
+        reference_candidates,
         key=lambda item: item["quality"]["f1Iqr"] + item["quality"]["f2Iqr"] * 0.25
     )
+    matched_reference = min(
+        reference_matches[id(selected)],
+        key=lambda ref: abs(selected["f1"] - float(ref["f1"])) + abs(selected["f2"] - float(ref["f2"]))
+    )
+    warnings: list[str] = []
+    if f1_spread > 90 or f2_spread > 180:
+        warnings.append("Formant ceiling에 따라 후보값이 달라져 자동값을 수동 Praat 확인과 함께 사용해야 합니다.")
     if selected["quality"]["f1Iqr"] > 90 or selected["quality"]["f2Iqr"] > 180:
-        raise ValueError("선택된 안정 구간에서도 포먼트 변동이 커 결과를 표시하지 않았습니다. 모음을 더 길고 일정하게 발음해 다시 시도해 주세요.")
+        warnings.append("안정 구간 안에서도 포먼트 변동이 커 수동 Praat 확인이 필요합니다.")
     selected["quality"]["ceilingSpread"] = {
         "f1": round(f1_spread, 1),
         "f2": round(f2_spread, 1),
-        "warning": ceiling_warning
+        "warning": " ".join(warnings) or None
+    }
+    selected["quality"]["referenceRange"] = {
+        "toleranceHz": REFERENCE_TOLERANCE_HZ,
+        "matchedGender": matched_reference["gender"],
+        "referenceF1": float(matched_reference["f1"]),
+        "referenceF2": float(matched_reference["f2"])
     }
     selected["quality"]["ceilingCandidates"] = [
         {
@@ -219,7 +266,8 @@ def health() -> dict[str, str]:
 @app.post("/analyze")
 async def analyze(
     audio: UploadFile = File(...),
-    target_vowel: str = Form(...)
+    target_vowel: str = Form(...),
+    reference_averages: str | None = Form(None)
 ) -> dict[str, Any]:
     suffix = Path(audio.filename or "recording.webm").suffix or ".webm"
     try:
@@ -234,7 +282,15 @@ async def analyze(
                     "message": "음성 활동이 감지되지 않아 Praat/Parselmouth 분석을 실행하지 않았습니다.",
                     "reason": "no_voice_activity"
                 })
-            result = analyse_formants(wav_path)
+            parsed_references: list[dict[str, Any]] | None = None
+            if reference_averages:
+                try:
+                    candidate_references = json.loads(reference_averages)
+                    if isinstance(candidate_references, list):
+                        parsed_references = candidate_references
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    parsed_references = None
+            result = analyse_formants(wav_path, target_vowel, parsed_references)
             return {
                 "ok": True,
                 "targetVowel": target_vowel,
