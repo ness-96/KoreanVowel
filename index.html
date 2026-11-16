@@ -193,6 +193,10 @@
     .mic-prompt { margin-top: 10px; padding: 12px; border-radius: 10px; background: #f4f7ff; color: #304b7a; font-size: 13px; font-weight: 700; line-height: 1.55; }
     .mic-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
     .mic-actions .submit-button, .mic-actions .secondary-button { margin-top: 0; }
+    .continuous-mic-actions { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+    .mic-live-indicator { min-width: 54px; padding: 9px 10px; border-radius: 9px; background: #f4f6f9; color: #8b97a7; font-size: 11px; font-weight: 800; text-align: center; }
+    .mic-live-indicator.on { color: #247a50; background: #eaf8f0; }
+
     .mic-status { margin-top: 10px; color: #60718a; font-size: 11px; line-height: 1.5; }
     .mic-result { margin-top: 8px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #53657e; font-size: 11px; line-height: 1.55; }
     .mic-result strong { color: #315fc4; }
@@ -360,7 +364,7 @@
             </select>
           </div>
           <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
-          <div class="mic-status" id="micStatus">선택한 모음만 0.5~1초 정도 안정적으로 발음하세요.</div>
+          <div class="mic-status" id="micStatus">마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.</div>
           <div class="mic-result" id="micResult">녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.</div>
           <div class="mic-formant-readout" id="micFormantReadout" aria-live="polite">
             <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
@@ -372,11 +376,11 @@
             <div class="mic-spectrum-note" id="micSpectrumNote">녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.</div>
           </div>
 
-          <div class="mic-actions">
-            <button class="submit-button" type="button" id="micStartBtn">모음 녹음 시작</button>
-            <button class="secondary-button" type="button" id="micStopBtn" disabled>녹음 중지</button>
+          <div class="mic-actions continuous-mic-actions">
+            <button class="submit-button" type="button" id="micToggleBtn">마이크 켜기</button>
+            <span class="mic-live-indicator" id="micLiveIndicator" aria-live="polite">꺼짐</span>
           </div>
-          <div class="data-note">HTTPS 환경과 마이크 권한이 필요합니다. 음성 활동과 안정적인 유성 구간이 확인된 경우에만 Praat/Parselmouth로 F1·F2를 측정합니다.</div>
+          <div class="data-note">마이크를 켜면 계속 듣습니다. 음성 구간을 약 2초마다 서버로 보내 Praat/Parselmouth F1·F2를 갱신하며, 일시정지하면 전송을 멈춥니다.</div>
         </section>
 
         <section class="panel">
@@ -498,14 +502,16 @@
     let micSpectrumFrames = [];
     let micActivityLevels = [];
     let micLastSampleAt = 0;
-    let micRecorder = null;
-    let micChunks = [];
-    let micRecordingPromise = null;
-    let micFinishTimer = null;
-    let micStopRequested = false;
-    let micAnalysisSnapshot = null;
     let micSpectrumSnapshot = null;
     let micServerFormants = null;
+    let micCaptureProcessor = null;
+    let micPcmChunks = [];
+    let micPcmSampleCount = 0;
+    let micPcmSampleRate = 0;
+    let micContinuousTimer = null;
+    let micServerBusy = false;
+    let micContinuousGeneration = 0;
+    let micLastLiveError = "";
     let pendingDeletion = null;
 
     const svg = document.getElementById('chart');
@@ -515,6 +521,8 @@
     const micSpectrumNote = document.getElementById('micSpectrumNote');
     const micF1Value = document.getElementById('micF1Value');
     const micF2Value = document.getElementById('micF2Value');
+    const micToggleBtn = document.getElementById('micToggleBtn');
+    const micLiveIndicator = document.getElementById('micLiveIndicator');
     const tooltip = document.getElementById('tooltip');
     const plot = { x: 78, y: 32, w: 748, h: 520 };
     const domain = { f2Min: 0, f2Max: 3000, f1Min: 0, f1Max: 1000 };
@@ -1186,223 +1194,255 @@
         waveform.forEach(value => { sumSquares += value * value; });
         const rms = Math.sqrt(sumSquares / Math.max(1, waveform.length));
         const rmsDb = 20 * Math.log10(Math.max(rms, 1e-8));
-        if (peak > -78) micSpectrumFrames.push(frame);
+        if (peak > -78) {
+          micSpectrumFrames.push(frame);
+          if (micSpectrumFrames.length > 80) micSpectrumFrames.shift();
+        }
         micActivityLevels.push({ timestamp, rmsDb });
+        if (micActivityLevels.length > 120) micActivityLevels.shift();
+        micSpectrumSnapshot = {
+          frames: micSpectrumFrames.slice(),
+          sampleRate: micAudioContext ? micAudioContext.sampleRate : 16000,
+          fftSize: micAnalyser.fftSize
+        };
+        drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
         micLastSampleAt = timestamp;
       }
       micAnimationFrame = requestAnimationFrame(monitorMic);
     }
 
-    function scheduleMicFinish(delay = 350) {
-      if (micFinishTimer) clearTimeout(micFinishTimer);
-      micFinishTimer = setTimeout(() => {
-        micFinishTimer = null;
-        if (micStopRequested) finishMicRecording();
-      }, delay);
+
+    function writeWavAscii(view, offset, value) {
+      for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index));
     }
-    async function finishMicRecording() {
-      if (!micAnalysisSnapshot) return;
-      if (micFinishTimer) { clearTimeout(micFinishTimer); micFinishTimer = null; }
-      const analysis = micAnalysisSnapshot;
-      micSpectrumSnapshot = analysis;
-      micServerFormants = null;
-      setMicFormantReadout(null);
-      drawMicSpectrum(micSpectrumSnapshot, null);
-      if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼입니다. 안정적인 서버 F1·F2가 없으면 세로선을 표시하지 않습니다.';
-      micAnalysisSnapshot = null;
+
+    function encodeMonoWav(samples, sampleRate) {
+      const safeRate = Math.max(8000, Math.round(Number(sampleRate) || 16000));
+      const dataLength = samples.length * 2;
+      const buffer = new ArrayBuffer(44 + dataLength);
+      const view = new DataView(buffer);
+      writeWavAscii(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeWavAscii(view, 8, 'WAVE');
+      writeWavAscii(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, safeRate, true);
+      view.setUint32(28, safeRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeWavAscii(view, 36, 'data');
+      view.setUint32(40, dataLength, true);
+      for (let index = 0; index < samples.length; index += 1) {
+        const sample = Math.max(-1, Math.min(1, Number(samples[index]) || 0));
+        view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function getRecentMicPcmWindow(seconds = 1.8) {
+      if (!micPcmSampleRate || micPcmSampleCount < Math.round(micPcmSampleRate * 0.8)) return null;
+      const targetLength = Math.min(micPcmSampleCount, Math.round(micPcmSampleRate * seconds));
+      const output = new Float32Array(targetLength);
+      let writeOffset = targetLength;
+      for (let index = micPcmChunks.length - 1; index >= 0 && writeOffset > 0; index -= 1) {
+        const chunk = micPcmChunks[index];
+        const take = Math.min(writeOffset, chunk.length);
+        writeOffset -= take;
+        output.set(chunk.subarray(chunk.length - take), writeOffset);
+      }
+      return writeOffset === 0 ? output : null;
+    }
+
+    function updateContinuousMicUi(isOn) {
+      if (micToggleBtn) {
+        micToggleBtn.textContent = isOn ? '마이크 일시정지' : '마이크 켜기';
+        micToggleBtn.classList.toggle('submit-button', !isOn);
+        micToggleBtn.classList.toggle('secondary-button', isOn);
+      }
+      if (micLiveIndicator) {
+        micLiveIndicator.textContent = isOn ? '듣는 중' : '꺼짐';
+        micLiveIndicator.classList.toggle('on', isOn);
+      }
+    }
+
+    async function sendContinuousAnalysis() {
+      if (!micStream || micServerBusy || !FORMANT_API_URL || !micPcmSampleRate) return;
+      const recentActivity = micActivityLevels.slice(-20).some(item => Number(item.rmsDb) > -50);
+      if (!recentActivity) return;
+      const samples = getRecentMicPcmWindow(1.8);
+      if (!samples) return;
+      const generation = micContinuousGeneration;
       const vowel = document.getElementById('micVowel').value;
-      const activityLevels = Array.isArray(analysis.activity) ? analysis.activity.map(item => Number(item.rmsDb)).filter(Number.isFinite) : [];
-      let activeFrames = 0;
-      let longestActiveRun = 0;
-      let currentActiveRun = 0;
-      activityLevels.forEach(level => {
-        if (level > -50) {
-          activeFrames += 1;
-          currentActiveRun += 1;
-          longestActiveRun = Math.max(longestActiveRun, currentActiveRun);
-        } else {
-          currentActiveRun = 0;
-        }
-      });
-      const voiceActivity = activityLevels.length >= 10 && activeFrames >= 8 && longestActiveRun >= 6;
-      let recordedAudio = null;
-      if (FORMANT_API_URL && micRecordingPromise) {
-        try { recordedAudio = await micRecordingPromise; } catch (error) {}
-      }
-      if (!voiceActivity) {
-        micPoint = null;
-        micServerFormants = null;
-        setMicFormantReadout(null);
-        drawMicSpectrum(micSpectrumSnapshot, null);
-        if (micSpectrumNote) micSpectrumNote.textContent = '음성 활동이 없어 서버 F1·F2 세로선을 표시하지 않았습니다.';
-        document.getElementById('micStatus').textContent = '음성 활동이 감지되지 않아 분석하지 않았습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>발음이 감지되지 않았습니다. 선택한 모음을 실제로 발음한 뒤 다시 시도해 주세요.';
-        render();
-        return;
-      }
-      const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
-      if (!useServer) {
-        micPoint = null;
-        micServerFormants = null;
-        setMicFormantReadout(null);
-        drawMicSpectrum(micSpectrumSnapshot, null);
-        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼은 표시하지만 서버 F1·F2는 표시하지 않습니다.';
-        document.getElementById('micStatus').textContent = 'Praat 서버를 사용할 수 없어 결과를 표시하지 않았습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>연구용 결과는 Praat/Parselmouth 서버 분석이 확인된 경우에만 표시합니다.';
-        render();
-        return;
-      }
-      document.getElementById('micStatus').textContent = '음성 활동이 확인되었습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.';
+      micServerBusy = true;
       let timeoutId = null;
       try {
         const formData = new FormData();
-        formData.append('audio', recordedAudio, 'recording.webm');
+        formData.append('audio', encodeMonoWav(samples, micPcmSampleRate), 'continuous-window.wav');
         formData.append('target_vowel', vowel);
         const referenceAveragesForMic = averageData
           .filter(item => item && item.vowel === vowel && (item.gender === 'female' || item.gender === 'male') && Number.isFinite(Number(item.f1)) && Number.isFinite(Number(item.f2)))
           .map(item => ({ gender: item.gender, vowel: item.vowel, f1: Number(item.f1), f2: Number(item.f2) }));
         formData.append('reference_averages', JSON.stringify(referenceAveragesForMic));
         const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 30000);
+        timeoutId = setTimeout(() => controller.abort(), 15000);
         const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
         if (timeoutId) clearTimeout(timeoutId);
-        const payload = await response.json();
+        const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.ok) {
           const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
           throw new Error(detail || payload.message || 'Praat 서버 분석에 실패했습니다.');
         }
+        if (generation !== micContinuousGeneration || !micStream) return;
+        micLastLiveError = '';
         micServerFormants = { f1: payload.f1, f2: payload.f2 };
         setMicFormantReadout(micServerFormants);
         drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
-        if (micSpectrumNote) micSpectrumNote.textContent = '파란 면적: 녹음 FFT 스펙트럼 · 초록 세로선: 서버 Praat/Parselmouth F1·F2';
-        micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
-        const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
-        const ceiling = payload.formantCeiling ? '<br>Formant ceiling: ' + Number(payload.formantCeiling).toFixed(0) + ' Hz' : '';
-        const stabilityWarning = payload.quality && payload.quality.ceilingSpread && payload.quality.ceilingSpread.warning ? '<br><strong>주의</strong> ' + esc(payload.quality.ceilingSpread.warning) : '';
-        document.getElementById('micStatus').textContent = stabilityWarning ? 'Praat/Parselmouth 분석이 완료되었지만 수동 확인이 필요합니다.' : 'Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + ceiling + stabilityWarning + '<br>측정: 고립 모음 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
+        if (micSpectrumNote) micSpectrumNote.textContent = '파란 면적: 실시간 녹음 FFT · 초록 세로선: 서버 Praat/Parselmouth F1·F2';
+        micPoint = { id: 'mic-live', speakerId: '내 발음', region: 'Praat 서버 연속 분석', nationality: '내 발음', gender: 'microphone', age: '실시간', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
+        const interval = payload.measurementInterval ? '<br>최근 측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
+        const warning = payload.quality && payload.quality.ceilingSpread && payload.quality.ceilingSpread.warning ? '<br><strong>주의</strong> ' + esc(payload.quality.ceilingSpread.warning) : '';
+        document.getElementById('micStatus').textContent = '마이크가 켜져 있습니다. 안정 구간을 찾을 때마다 서버값을 갱신합니다.';
+        document.getElementById('micResult').innerHTML = '<strong>Praat 서버값 갱신</strong><br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + warning;
         render();
-        return;
       } catch (error) {
         if (timeoutId) clearTimeout(timeoutId);
-        micPoint = null;
-        micServerFormants = null;
-        setMicFormantReadout(null);
-        drawMicSpectrum(micSpectrumSnapshot, null);
-        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 스펙트럼은 표시하지만 안정적인 서버 F1·F2는 표시하지 않습니다.';
-        const message = error && error.name === 'AbortError' ? '서버 분석이 30초 안에 끝나지 않았습니다.' : (error.message || 'Praat 서버 분석에 실패했습니다.');
-        document.getElementById('micStatus').textContent = 'Praat 서버 분석이 불안정해 결과를 표시하지 않았습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(message) + '<br>모음을 더 길고 일정하게 발음한 뒤 다시 시도해 주세요.';
+        if (generation !== micContinuousGeneration || !micStream) return;
+        micLastLiveError = error && error.name === 'AbortError' ? '서버 분석이 15초 안에 끝나지 않았습니다.' : (error.message || 'Praat 서버 분석에 실패했습니다.');
+        if (micServerFormants) {
+          document.getElementById('micStatus').textContent = '마지막 안정값을 유지하고 새 안정 구간을 기다리는 중입니다.';
+        } else {
+          setMicFormantReadout(null);
+          document.getElementById('micStatus').textContent = '안정적인 F1·F2 구간을 기다리는 중입니다.';
+          document.getElementById('micResult').innerHTML = '<strong>아직 표시하지 않음</strong><br>' + esc(micLastLiveError);
+        }
         render();
-        return;
+      } finally {
+        micServerBusy = false;
       }
     }
 
-    async function startMicRecording() {
+    function releaseContinuousMicResources() {
+      if (micContinuousTimer) clearInterval(micContinuousTimer);
+      micContinuousTimer = null;
+      if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
+      micAnimationFrame = null;
+      if (micCaptureProcessor) {
+        micCaptureProcessor.onaudioprocess = null;
+        try { micCaptureProcessor.disconnect(); } catch (error) {}
+      }
+      micCaptureProcessor = null;
+      if (micStream) micStream.getTracks().forEach(track => track.stop());
+      micStream = null;
+      if (micAudioContext) {
+        try { micAudioContext.close(); } catch (error) {}
+      }
+      micAnalyser = null;
+      micAudioContext = null;
+      micPcmChunks = [];
+      micPcmSampleCount = 0;
+      micPcmSampleRate = 0;
+      micServerBusy = false;
+    }
+
+    async function startContinuousMic() {
       if (micStream) return;
       const status = document.getElementById('micStatus');
-      const startButton = document.getElementById('micStartBtn');
-      const stopButton = document.getElementById('micStopBtn');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         status.textContent = '이 브라우저에서는 마이크 접근을 사용할 수 없습니다. HTTPS 주소에서 다시 시도해 주세요.';
         return;
       }
       try {
-        micStopRequested = false;
+        micContinuousGeneration += 1;
+        micLastLiveError = '';
         micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) throw new Error('AudioContext unavailable');
         micAudioContext = new AudioContextClass();
         if (micAudioContext.state === 'suspended') await micAudioContext.resume();
-        if (FORMANT_API_URL) {
-          if (!window.MediaRecorder) throw new Error('MediaRecorder unavailable');
-          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-          micChunks = [];
-          micRecorder = new MediaRecorder(micStream, { mimeType });
-          micRecordingPromise = new Promise(resolve => {
-            micRecorder.ondataavailable = event => { if (event.data && event.data.size) micChunks.push(event.data); };
-            micRecorder.onstop = () => {
-              const blob = new Blob(micChunks, { type: micRecorder.mimeType || mimeType });
-              micRecorder = null;
-              resolve(blob);
-            };
-          });
-          micRecorder.start(100);
-        }
+        if (!micAudioContext.createScriptProcessor) throw new Error('ScriptProcessor unavailable');
         const source = micAudioContext.createMediaStreamSource(micStream);
         micAnalyser = micAudioContext.createAnalyser();
         micAnalyser.fftSize = 2048;
+        micCaptureProcessor = micAudioContext.createScriptProcessor(4096, 1, 1);
+        micPcmSampleRate = micAudioContext.sampleRate;
+        micPcmChunks = [];
+        micPcmSampleCount = 0;
+        micCaptureProcessor.onaudioprocess = event => {
+          if (!micStream) return;
+          const input = event.inputBuffer.getChannelData(0);
+          const copy = new Float32Array(input);
+          micPcmChunks.push(copy);
+          micPcmSampleCount += copy.length;
+          const maxSamples = Math.round(micPcmSampleRate * 4);
+          while (micPcmSampleCount > maxSamples && micPcmChunks.length) {
+            const removed = micPcmChunks.shift();
+            micPcmSampleCount -= removed.length;
+          }
+        };
         source.connect(micAnalyser);
+        source.connect(micCaptureProcessor);
         const silentOutput = micAudioContext.createGain();
         silentOutput.gain.value = 0;
-        micAnalyser.connect(silentOutput).connect(micAudioContext.destination);
+        micAnalyser.connect(silentOutput);
+        micCaptureProcessor.connect(silentOutput);
+        silentOutput.connect(micAudioContext.destination);
         micSpectrumFrames = [];
-        micSpectrumSnapshot = null;
-        micServerFormants = null;
         micActivityLevels = [];
         micLastSampleAt = 0;
+        micSpectrumSnapshot = null;
+        micServerFormants = null;
         micPoint = null;
         setMicFormantReadout(null);
         drawMicSpectrum(null, null);
-        if (micSpectrumNote) micSpectrumNote.textContent = '녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.';
-        document.getElementById('micResult').textContent = '녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.';
-        render();
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        status.textContent = '선택한 모음만 길게 발음하세요. 다 발음한 뒤 녹음 중지를 눌러 주세요.';
+        if (micSpectrumNote) micSpectrumNote.textContent = '실시간 녹음 스펙트럼입니다. 안정적인 서버 F1·F2가 생기면 초록 세로선이 표시됩니다.';
+        document.getElementById('micResult').textContent = '연속 분석 대기 중입니다. 선택한 모음을 일정하게 발음하세요.';
+        updateContinuousMicUi(true);
+        status.textContent = '마이크가 켜졌습니다. 선택한 모음을 계속 발음하면 서버값을 갱신합니다.';
         micAnimationFrame = requestAnimationFrame(monitorMic);
+        micContinuousTimer = setInterval(sendContinuousAnalysis, 2000);
+        render();
       } catch (error) {
-        if (micStream) micStream.getTracks().forEach(track => track.stop());
-        if (micAudioContext) micAudioContext.close();
-        micStream = null;
-        micAnalyser = null;
-        micAudioContext = null;
-        status.textContent = '마이크 권한 또는 녹음 기능을 사용할 수 없습니다. 브라우저 권한을 확인해 주세요.';
+        releaseContinuousMicResources();
+        updateContinuousMicUi(false);
+        status.textContent = '마이크 권한 또는 연속 녹음 기능을 사용할 수 없습니다. 브라우저 권한을 확인해 주세요.';
       }
     }
 
-    function stopMicRecording() {
-      if (!micStream || micStopRequested) return;
-      micStopRequested = true;
-      if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
-      micAnalysisSnapshot = micAudioContext && micAnalyser ? {
-        frames: micSpectrumFrames.slice(),
-        activity: micActivityLevels.slice(),
-        sampleRate: micAudioContext.sampleRate,
-        fftSize: micAnalyser.fftSize
-      } : null;
-      if (micRecorder && micRecorder.state !== 'inactive') micRecorder.stop();
-      micStream.getTracks().forEach(track => track.stop());
-      if (micAudioContext) micAudioContext.close();
-      micStream = null;
-      micAnalyser = null;
-      micAudioContext = null;
-      micAnimationFrame = null;
-      document.getElementById('micStartBtn').disabled = false;
-      document.getElementById('micStopBtn').disabled = true;
-      document.getElementById('micStatus').textContent = 'Praat/Parselmouth로 안정 구간을 분석 중입니다.';
-      finishMicRecording();
+    function pauseContinuousMic() {
+      if (!micStream) return;
+      micContinuousGeneration += 1;
+      releaseContinuousMicResources();
+      updateContinuousMicUi(false);
+      document.getElementById('micStatus').textContent = '마이크가 일시정지되었습니다. 다시 켜면 계속 분석합니다.';
+      document.getElementById('micResult').textContent = micServerFormants ? '마지막 Praat 서버값을 유지하고 있습니다.' : '분석값이 없습니다.';
+      render();
+    }
+
+    function toggleContinuousMic() {
+      if (micStream) pauseContinuousMic();
+      else startContinuousMic();
     }
 
     function resetMicAnalysisForVowelChange() {
       updateMicPrompt();
-      if (micStream) return;
+      micContinuousGeneration += 1;
+      micLastLiveError = '';
       micPoint = null;
-      micAnalysisSnapshot = null;
-      micSpectrumSnapshot = null;
       micServerFormants = null;
       setMicFormantReadout(null);
-      drawMicSpectrum(null, null);
-      if (micSpectrumNote) micSpectrumNote.textContent = '녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.';
-      document.getElementById('micStatus').textContent = '선택한 모음만 0.5~1초 정도 안정적으로 발음하세요.';
-      document.getElementById('micResult').textContent = '녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.';
+      drawMicSpectrum(micSpectrumSnapshot, null);
+      if (micSpectrumNote) micSpectrumNote.textContent = micStream ? '새 표적 모음의 안정 구간을 기다리는 중입니다.' : '마이크를 켜면 실시간 스펙트럼과 서버 F1·F2가 표시됩니다.';
+      document.getElementById('micStatus').textContent = micStream ? '마이크가 켜져 있습니다. 새로 선택한 모음을 일정하게 발음하세요.' : '마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.';
+      document.getElementById('micResult').textContent = micStream ? '새 표적 모음으로 연속 분석 대기 중입니다.' : '마이크를 켜면 Praat/Parselmouth 서버 분석을 시작합니다.';
       render();
     }
     document.getElementById('micVowel').addEventListener('change', resetMicAnalysisForVowelChange);
     document.getElementById('region').addEventListener('change', updateRegionField);
     document.getElementById('age').addEventListener('change', updateInputMode);
-    document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
-    document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
+    document.getElementById('micToggleBtn').addEventListener('click', toggleContinuousMic);
+    window.addEventListener('beforeunload', () => { if (micStream) pauseContinuousMic(); });
     window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
