@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "small")
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "tiny")
 FORMANT_CEILING = float(os.getenv("FORMANT_CEILING", "5500"))
 _whisper_model: WhisperModel | None = None
 
@@ -65,7 +65,7 @@ def transcribe_target(wav_path: Path, target_word: str) -> dict[str, Any]:
         language="ko",
         word_timestamps=True,
         vad_filter=True,
-        beam_size=5
+        beam_size=1
     )
     segments = list(segments)
     transcript = " ".join(segment.text.strip() for segment in segments).strip()
