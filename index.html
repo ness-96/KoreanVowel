@@ -1084,6 +1084,10 @@
         const formData = new FormData();
         formData.append('audio', recordedAudio, 'recording.webm');
         formData.append('target_vowel', vowel);
+        const referenceAveragesForMic = averageData
+          .filter(item => item && item.vowel === vowel && (item.gender === 'female' || item.gender === 'male') && Number.isFinite(Number(item.f1)) && Number.isFinite(Number(item.f2)))
+          .map(item => ({ gender: item.gender, vowel: item.vowel, f1: Number(item.f1), f2: Number(item.f2) }));
+        formData.append('reference_averages', JSON.stringify(referenceAveragesForMic));
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), 30000);
         const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
