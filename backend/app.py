@@ -195,6 +195,17 @@ def analyse_formants(
         "f2": round(f2_spread, 1),
         "warning": ceiling_warning
     }
+    selected["quality"]["ceilingCandidates"] = [
+        {
+            "formantCeiling": item["formantCeiling"],
+            "f1": item["f1"],
+            "f2": item["f2"],
+            "f1Iqr": item["quality"]["f1Iqr"],
+            "f2Iqr": item["quality"]["f2Iqr"],
+            "selected": item is selected
+        }
+        for item in candidates
+    ]
     return selected
 
 
