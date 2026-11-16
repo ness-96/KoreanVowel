@@ -365,7 +365,7 @@
           </div>
           <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
           <div class="mic-status" id="micStatus">마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.</div>
-          <div class="mic-result" id="micResult">녹음 후 Praat/Parselmouth로 F1·F2를 분석합니다.</div>
+          <div class="mic-result" id="micResult">음성 구간을 서버의 Praat/Parselmouth로 분석합니다.</div>
           <div class="mic-formant-readout" id="micFormantReadout" aria-live="polite">
             <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
             <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
@@ -373,7 +373,7 @@
           <div class="mic-spectrum-panel">
             <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–5000 Hz</span></div>
             <canvas id="micSpectrum" width="620" height="170" aria-label="녹음 주파수 스펙트럼"></canvas>
-            <div class="mic-spectrum-note" id="micSpectrumNote">녹음 후 스펙트럼을 표시합니다. 세로선은 서버 Praat/Parselmouth F1·F2입니다.</div>
+            <div class="mic-spectrum-note" id="micSpectrumNote">마이크를 켜면 실시간 스펙트럼과 서버 Praat/Parselmouth F1·F2가 표시됩니다.</div>
           </div>
 
           <div class="mic-actions continuous-mic-actions">
