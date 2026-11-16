@@ -13,6 +13,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Korean vowel formant analyzer", version="0.1.0")
+FORMANT_CEILING = float(os.getenv("FORMANT_CEILING", "5500"))
 
 origins = [item.strip() for item in os.getenv("CORS_ORIGINS", "*").split(",") if item.strip()]
 app.add_middleware(
