@@ -288,7 +288,7 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot male"></span>남성</span>
-          <span class="legend-item"><span class="legend-dot blue"></span>내 발음(예비 분석)</span>
+          <span class="legend-item"><span class="legend-dot blue"></span>내 발음(Praat 서버)</span>
           <span class="legend-item"><span class="legend-dot average"></span>연령대·성별 평균</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
         </div>
@@ -915,7 +915,7 @@
         ? `<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>${esc(d.country || '미입력')}</b></div>`
         : `<div class="tooltip-row"><span>지역</span><b>${esc(locationLabel(d))}</b></div>`;
       const details = isMic
-        ? `<div class="tooltip-row"><span>자료</span><b>마이크 예비 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
+        ? `<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
         : isAverage
           ? `<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div>`
           : `<div class="tooltip-row"><span>반복 토큰</span><b>${d.tokenNo || 1}회</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div>${locationDetails}`;
@@ -942,7 +942,7 @@
       const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
       const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
       const vowelFocus = selectedVowel === 'all' ? '' : ` · ${selectedVowel} 모음 강조` ;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 토큰 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음 예비 분석입니다.' : ''}`;
+      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 토큰 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음(Praat 서버)입니다.' : ''}`;
     }
 
     function updateMicPrompt() {
