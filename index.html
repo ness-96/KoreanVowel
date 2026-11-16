@@ -1078,72 +1078,50 @@
         return;
       }
       const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
-      const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
-      if (useServer) {
-        document.getElementById('micStatus').textContent = sttConfirmed ? 'STT로 모음을 확인했습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.' : '음성 활동을 감지했습니다. 서버 STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석 중입니다.';
-        let timeoutId = null;
-        try {
-          const formData = new FormData();
-          formData.append('audio', recordedAudio, 'recording.webm');
-          formData.append('target_vowel', vowel);
-          formData.append('target_word', target);
-          const controller = new AbortController();
-          timeoutId = setTimeout(() => controller.abort(), 30000);
-          const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
-          if (timeoutId) clearTimeout(timeoutId);
-          const payload = await response.json();
-          if (!response.ok || !payload.ok) {
-            const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
-            throw new Error(detail || payload.message || '서버 분석에 실패했습니다.');
-          }
-          micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
-          const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
-          document.getElementById('micStatus').textContent = 'STT 확인과 Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
-          document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>전사 결과: ' + esc(payload.transcript || target) + '<br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + '<br>측정: 모음 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
-          render();
-          return;
-        } catch (error) {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (!sttConfirmed) {
-            micPoint = null;
-            const message = error && error.name === 'AbortError' ? '서버 확인이 30초 안에 끝나지 않았습니다.' : (error.message || 'STT 또는 서버 분석에 실패했습니다.');
-            document.getElementById('micStatus').textContent = '표적 모음 발화를 확인하지 못해 F1·F2를 표시하지 않았습니다.';
-            document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(message) + '<br>“' + esc(target) + '” 모음만 길게 발음한 뒤 다시 시도해 주세요.';
-            render();
-            return;
-          }
-          if (estimate) {
-            micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크 예비 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
-            document.getElementById('micStatus').textContent = '서버 Praat 분석에 실패해 브라우저 예비값을 표시합니다.';
-            document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>' + esc(error.message || '서버 분석에 연결할 수 없습니다.') + '<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
-            render();
-            return;
-          }
-          micPoint = null;
-          document.getElementById('micStatus').textContent = '서버 Praat 분석에 실패했습니다.';
-          document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
-          render();
-          return;
+      if (!useServer) {
+        micPoint = null;
+        document.getElementById('micStatus').textContent = 'Praat 서버를 사용할 수 없어 결과를 표시하지 않았습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>연구용 결과는 Praat/Parselmouth 서버 분석이 확인된 경우에만 표시합니다.';
+        render();
+        return;
+      }
+      document.getElementById('micStatus').textContent = sttConfirmed ? 'STT로 모음을 확인했습니다. Praat/Parselmouth 서버에서 F1·F2를 분석 중입니다.' : '음성 활동을 감지했습니다. 서버 STT로 모음 발화를 확인한 뒤 Praat/Parselmouth로 분석 중입니다.';
+      let timeoutId = null;
+      try {
+        const formData = new FormData();
+        formData.append('audio', recordedAudio, 'recording.webm');
+        formData.append('target_vowel', vowel);
+        formData.append('target_word', target);
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
+        if (timeoutId) clearTimeout(timeoutId);
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
+          throw new Error(detail || payload.message || 'Praat 서버 분석에 실패했습니다.');
         }
-      }
-      if (!sttConfirmed) {
+        micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
+        const interval = payload.measurementInterval ? '<br>측정 구간: ' + Number(payload.measurementInterval.start).toFixed(2) + '–' + Number(payload.measurementInterval.end).toFixed(2) + '초' : '';
+        const ceiling = payload.formantCeiling ? '<br>Formant ceiling: ' + Number(payload.formantCeiling).toFixed(0) + ' Hz' : '';
+        document.getElementById('micStatus').textContent = 'STT 확인과 Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
+        document.getElementById('micResult').innerHTML = '<strong>Praat 서버 분석 완료</strong><br>전사 결과: ' + esc(payload.transcript || target) + '<br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz' + interval + ceiling + '<br>측정: 표적 단어 구간 안 안정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
+        render();
+        return;
+      } catch (error) {
+        if (timeoutId) clearTimeout(timeoutId);
         micPoint = null;
-        document.getElementById('micStatus').textContent = '표적 모음 발화를 확인하지 못해 F1·F2를 표시하지 않았습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>STT에서 “' + esc(target) + '” 모음을 확인하지 못했습니다. 모음만 길게 발음한 뒤 다시 시도해 주세요.';
+        if (!sttConfirmed) {
+          const message = error && error.name === 'AbortError' ? '서버 확인이 30초 안에 끝나지 않았습니다.' : (error.message || 'STT 또는 Praat 서버 분석에 실패했습니다.');
+          document.getElementById('micStatus').textContent = '표적 모음 발화를 확인하지 못해 F1·F2를 표시하지 않았습니다.';
+          document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(message) + '<br>“' + esc(target) + '” 모음만 길게 발음한 뒤 다시 시도해 주세요.';
+        } else {
+          document.getElementById('micStatus').textContent = 'Praat 서버 분석이 불안정해 결과를 표시하지 않았습니다.';
+          document.getElementById('micResult').innerHTML = '<strong>분석하지 않음</strong><br>' + esc(error.message || 'Praat 서버 분석에 실패했습니다.') + '<br>자동 예비값은 표시하지 않습니다.';
+        }
         render();
         return;
       }
-      if (!estimate) {
-        micPoint = null;
-        document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다.';
-        document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>모음을 충분히 길게 발음했는지 확인해 주세요.';
-        render();
-        return;
-      }
-      micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
-      document.getElementById('micStatus').textContent = '브라우저 예비 F1·F2 추정이 완료되었습니다.';
-      document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>STT 확인: “' + esc(target) + '”<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
-      render();
     }
 
     async function startMicRecording() {
