@@ -62,6 +62,27 @@ def convert_to_wav(input_path: Path, output_path: Path) -> None:
         raise RuntimeError(completed.stderr[-1000:] or "음성 파일 변환에 실패했습니다.")
 
 
+def match_target_word_sequence(words: list[dict[str, Any]], target_norm: str) -> dict[str, Any] | None:
+    if not target_norm:
+        return None
+    for start_index in range(len(words)):
+        combined = ""
+        for end_index in range(start_index, min(len(words), start_index + 4)):
+            token = normalize_text(words[end_index]["text"])
+            if not token:
+                continue
+            combined += token
+            if combined == target_norm:
+                return {
+                    "text": " ".join(item["text"] for item in words[start_index:end_index + 1]),
+                    "start": float(words[start_index]["start"]),
+                    "end": float(words[end_index]["end"])
+                }
+            if len(combined) >= len(target_norm):
+                break
+    return None
+
+
 def transcribe_target(wav_path: Path, target_word: str) -> dict[str, Any]:
     model = get_whisper_model()
     segments, _info = model.transcribe(
@@ -85,17 +106,9 @@ def transcribe_target(wav_path: Path, target_word: str) -> dict[str, Any]:
                 "end": float(word.end)
             })
 
-    matched = next((word for word in words if target_norm and target_norm in normalize_text(word["text"])), None)
+    matched = match_target_word_sequence(words, target_norm)
     if matched:
         return {"transcript": transcript, "targetMatched": True, "word": matched, "segments": segments}
-
-    if target_norm and target_norm in normalize_text(transcript) and segments:
-        return {
-            "transcript": transcript,
-            "targetMatched": True,
-            "word": {"text": target_word, "start": float(segments[0].start), "end": float(segments[-1].end)},
-            "segments": segments
-        }
     return {"transcript": transcript, "targetMatched": False, "word": None, "segments": segments}
 
 
