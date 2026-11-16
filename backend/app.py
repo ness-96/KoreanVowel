@@ -86,52 +86,46 @@ def finite_formant(formant: parselmouth.Formant, number: int, time: float) -> fl
     return value if np.isfinite(value) else None
 
 
-def find_longest_vowel_run(
+def find_longest_voiced_run(
     sound: parselmouth.Sound,
     word_start: float,
-    word_end: float,
-    maximum_formant: float
+    word_end: float
 ) -> list[dict[str, float]]:
     pitch = sound.to_pitch(time_step=0.005, pitch_floor=60, pitch_ceiling=500)
-    formant = sound.to_formant_burg(
-        time_step=0.005,
-        max_number_of_formants=5,
-        maximum_formant=maximum_formant,
-        window_length=0.025,
-        pre_emphasis_from=50
-    )
+    values = np.asarray(sound.values, dtype=float)
+    samples = values[0] if values.ndim > 1 else values
+    frame_length = max(1, int(sound.sampling_frequency * 0.025))
     start = max(0.0, float(word_start) - 0.12)
     end = min(sound.duration, float(word_end) + 0.12)
     times = np.arange(start, end, 0.005)
-    valid: list[dict[str, float]] = []
+    voiced: list[dict[str, float]] = []
     for time in times:
+        center_index = int(float(time) * sound.sampling_frequency)
+        frame_start = max(0, center_index - frame_length // 2)
+        frame = samples[frame_start:frame_start + frame_length]
+        if len(frame) < frame_length // 2:
+            continue
+        rms = float(np.sqrt(np.mean(np.square(frame))))
         f0 = float(pitch.get_value_at_time(float(time)))
-        f1 = finite_formant(formant, 1, float(time))
-        f2 = finite_formant(formant, 2, float(time))
-        if not np.isfinite(f0) or f0 <= 0 or f1 is None or f2 is None:
-            continue
-        if not (200 <= f1 <= 1200 and 500 <= f2 <= 3500):
-            continue
-        valid.append({"time": float(time), "f1": f1, "f2": f2})
+        if rms > 0.0035 and np.isfinite(f0) and 70 <= f0 <= 500:
+            voiced.append({"time": float(time)})
 
     runs: list[list[dict[str, float]]] = []
     current: list[dict[str, float]] = []
-    for item in valid:
+    for item in voiced:
         if current and item["time"] - current[-1]["time"] > 0.015:
             runs.append(current)
             current = []
         current.append(item)
     if current:
         runs.append(current)
-
     qualified = [
         run for run in runs
         if len(run) >= 8 and run[-1]["time"] - run[0]["time"] >= 0.08
     ]
     if not qualified:
-        raise ValueError("고립 모음 녹음에서 충분히 긴 유성·안정 포먼트 구간을 찾지 못했습니다.")
+        raise ValueError("고립 모음 녹음에서 충분히 긴 유성 구간을 찾지 못했습니다.")
     return max(qualified, key=lambda run: (run[-1]["time"] - run[0]["time"], len(run)))
-
 
 def median(values: list[float]) -> float:
     return float(np.median(np.asarray(values, dtype=float)))
@@ -139,19 +133,35 @@ def median(values: list[float]) -> float:
 
 def analyse_with_ceiling(
     sound: parselmouth.Sound,
-    word_start: float,
-    word_end: float,
+    voiced_run: list[dict[str, float]],
     maximum_formant: float
 ) -> dict[str, Any]:
-    run = find_longest_vowel_run(sound, word_start, word_end, maximum_formant)
-    vowel_start = run[0]["time"]
-    vowel_end = run[-1]["time"] + 0.005
+    formant = sound.to_formant_burg(
+        time_step=0.005,
+        max_number_of_formants=5,
+        maximum_formant=maximum_formant,
+        window_length=0.025,
+        pre_emphasis_from=50
+    )
+    vowel_start = voiced_run[0]["time"]
+    vowel_end = voiced_run[-1]["time"] + 0.005
     duration = vowel_end - vowel_start
     measurement_start = vowel_start + duration * 0.40
     measurement_end = vowel_start + duration * 0.60
-    selected = [item for item in run if measurement_start <= item["time"] <= measurement_end]
+    selected: list[dict[str, float]] = []
+    for item in voiced_run:
+        time = item["time"]
+        if not measurement_start <= time <= measurement_end:
+            continue
+        f1 = finite_formant(formant, 1, time)
+        f2 = finite_formant(formant, 2, time)
+        if f1 is None or f2 is None:
+            continue
+        if not (200 <= f1 <= 1200 and 500 <= f2 <= 3500):
+            continue
+        selected.append({"time": time, "f1": f1, "f2": f2})
     if len(selected) < 3:
-        raise ValueError("모음 안정 구간의 중앙 20% 프레임이 부족합니다.")
+        raise ValueError("모음 안정 구간의 중앙 20%에서 유효한 F1·F2 프레임이 부족합니다.")
 
     f1_values = [item["f1"] for item in selected]
     f2_values = [item["f2"] for item in selected]
@@ -160,7 +170,7 @@ def analyse_with_ceiling(
     return {
         "f1": round(median(f1_values), 1),
         "f2": round(median(f2_values), 1),
-        "method": "Praat Formant Burg via Parselmouth (isolated-vowel recording, central 20%)",
+        "method": "Praat Formant Burg via Parselmouth (common voiced interval, central 20%)",
         "formantCeiling": maximum_formant,
         "vowelInterval": {"start": round(vowel_start, 4), "end": round(vowel_end, 4)},
         "measurementInterval": {"start": round(measurement_start, 4), "end": round(measurement_end, 4)},
@@ -169,10 +179,9 @@ def analyse_with_ceiling(
             "f1Iqr": round(f1_iqr, 1),
             "f2Iqr": round(f2_iqr, 1),
             "runDuration": round(duration, 4),
-            "segmentation": "longest voiced and formant-stable run in the isolated-vowel recording"
+            "segmentation": "common longest voiced interval; formant candidates compared on the same central 20%"
         }
     }
-
 
 def analyse_formants(
     wav_path: Path,
@@ -184,12 +193,13 @@ def analyse_formants(
     sound = parselmouth.Sound(str(wav_path))
     if word_end is None:
         word_end = sound.duration
+    voiced_run = find_longest_voiced_run(sound, word_start, word_end)
     candidates: list[dict[str, Any]] = []
     for ceiling in (5000.0, 5500.0, FORMANT_CEILING):
         if ceiling in {item.get("formantCeiling") for item in candidates}:
             continue
         try:
-            candidates.append(analyse_with_ceiling(sound, word_start, word_end, ceiling))
+            candidates.append(analyse_with_ceiling(sound, voiced_run, ceiling))
         except ValueError:
             continue
     if not candidates:
