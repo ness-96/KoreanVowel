@@ -1,0 +1,80 @@
+name: Backup Supabase vowel data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 15 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export active token rows
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/korean-vowel-backup
+          curl --fail --silent --show-error \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/vowel_tokens?select=id,speaker_id,region,gender,age,vowel,f1,f2,token_no,source,batch_id,created_at&deleted_at=is.null&order=created_at.asc,id.asc" \
+            > /tmp/korean-vowel-backup/tokens.json
+      - name: Build anonymized backup
+        env:
+          BACKUP_SALT: ${{ secrets.BACKUP_SALT }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const rows = JSON.parse(fs.readFileSync('/tmp/korean-vowel-backup/tokens.json', 'utf8'));
+          const salt = process.env.BACKUP_SALT || 'set-a-backup-salt';
+          const speakerMap = new Map();
+          const anonymize = (value) => {
+            const original = String(value || '');
+            if (!speakerMap.has(original)) {
+              const digest = crypto.createHash('sha256').update(salt + '|' + original).digest('hex').slice(0, 16);
+              speakerMap.set(original, 'spk-' + digest);
+            }
+            return speakerMap.get(original);
+          };
+          const backup = {
+            exportedAt: new Date().toISOString(),
+            source: 'supabase',
+            speakerData: rows.map(row => ({
+              id: row.id,
+              speakerId: anonymize(row.speaker_id),
+              region: row.region,
+              gender: row.gender,
+              age: row.age,
+              vowel: row.vowel,
+              f1: row.f1,
+              f2: row.f2,
+              tokenNo: row.token_no,
+              source: row.source || 'manual',
+              batchId: row.batch_id,
+              createdAt: row.created_at
+            })),
+            averageData: []
+          };
+          fs.writeFileSync('/tmp/korean-vowel-backup/shared-vowel-data.json', JSON.stringify(backup, null, 2) + '\n');
+          NODE
+      - name: Commit backup to data-backups branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin data-backups:data-backups || true
+          git checkout -B data-backups
+          mkdir -p data/supabase-backups
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          cp /tmp/korean-vowel-backup/shared-vowel-data.json "data/supabase-backups/shared-vowel-data-${stamp}.json"
+          cp /tmp/korean-vowel-backup/shared-vowel-data.json data/supabase-backups/latest.json
+          git add data/supabase-backups
+          git commit -m "Backup Supabase vowel data ${stamp}" || exit 0
+          git push origin data-backups
