@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
 import hmac
 import json
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 import os
 import shutil
 import subprocess
@@ -39,7 +43,10 @@ app.add_middleware(
 )
 
 
-SHARED_DATA_PATH = Path(os.getenv("SHARED_DATA_PATH", "/app/shared-vowel-data.json"))
+GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "ness-96/KoreanVowel")
+GITHUB_DATA_PATH = os.getenv("GITHUB_DATA_PATH", "data/shared-vowel-data.json")
+GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 SHARED_DATA_PASSWORD = os.getenv("SHARED_DATA_PASSWORD", "")
 SHARED_DATA_LOCK = threading.Lock()
 SHARED_VOWELS = {"ㅣ", "ㅔ", "ㅐ", "ㅏ", "ㅓ", "ㅡ", "ㅗ", "ㅜ"}
@@ -100,26 +107,71 @@ def normalize_shared_average_records(records: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def read_shared_data() -> dict[str, list[dict[str, Any]]]:
-    if not SHARED_DATA_PATH.exists():
-        return {"speakerData": [], "averageData": []}
+def empty_shared_data() -> dict[str, list[dict[str, Any]]]:
+    return {"speakerData": [], "averageData": []}
+
+
+def github_contents_request(method: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    encoded_path = urllib.parse.quote(GITHUB_DATA_PATH, safe="/")
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/contents/{encoded_path}"
+    if method == "GET":
+        url += "?ref=" + urllib.parse.quote(GITHUB_BRANCH, safe="")
+    request = urllib.request.Request(url, method=method)
+    request.add_header("Accept", "application/vnd.github+json")
+    request.add_header("X-GitHub-Api-Version", "2022-11-28")
+    if GITHUB_TOKEN:
+        request.add_header("Authorization", f"Bearer {GITHUB_TOKEN}")
+    if body is not None:
+        request.add_header("Content-Type", "application/json")
+        request.data = json.dumps(body).encode("utf-8")
+    with urllib.request.urlopen(request, timeout=20) as response:
+        response_body = response.read().decode("utf-8")
+    return json.loads(response_body) if response_body else {}
+
+
+def read_shared_data_with_sha() -> tuple[dict[str, list[dict[str, Any]]], str | None]:
     try:
-        payload = json.loads(SHARED_DATA_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
-        return {"speakerData": [], "averageData": []}
-    if not isinstance(payload, dict):
-        return {"speakerData": [], "averageData": []}
-    return {
-        "speakerData": normalize_shared_speaker_records(payload.get("speakerData", [])),
-        "averageData": normalize_shared_average_records(payload.get("averageData", [])),
+        github_file = github_contents_request("GET")
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return empty_shared_data(), None
+        raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 읽지 못했습니다 (HTTP {error.code}).") from error
+    encoded_content = str(github_file.get("content", "")).replace("\n", "")
+    try:
+        decoded_content = base64.b64decode(encoded_content).decode("utf-8")
+        raw_payload = json.loads(decoded_content)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        raw_payload = {}
+    if not isinstance(raw_payload, dict):
+        raw_payload = {}
+    payload = {
+        "speakerData": normalize_shared_speaker_records(raw_payload.get("speakerData", [])),
+        "averageData": normalize_shared_average_records(raw_payload.get("averageData", [])),
     }
+    return payload, str(github_file.get("sha")) if github_file.get("sha") else None
 
 
-def write_shared_data(payload: dict[str, list[dict[str, Any]]]) -> None:
-    SHARED_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = SHARED_DATA_PATH.with_suffix(SHARED_DATA_PATH.suffix + ".tmp")
-    temporary_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary_path.replace(SHARED_DATA_PATH)
+def read_shared_data() -> dict[str, list[dict[str, Any]]]:
+    return read_shared_data_with_sha()[0]
+
+
+def write_shared_data(payload: dict[str, list[dict[str, Any]]], sha: str | None) -> None:
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=503, detail="GitHub 쓰기 토큰이 Render에 설정되지 않았습니다.")
+    content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    request_body: dict[str, Any] = {
+        "message": "Update shared vowel data",
+        "content": base64.b64encode(content).decode("ascii"),
+        "branch": GITHUB_BRANCH,
+    }
+    if sha:
+        request_body["sha"] = sha
+    try:
+        github_contents_request("PUT", request_body)
+    except urllib.error.HTTPError as error:
+        if error.code == 409:
+            raise HTTPException(status_code=409, detail="GitHub 공유 파일이 동시에 변경되었습니다. 다시 시도해 주세요.") from error
+        raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 저장하지 못했습니다 (HTTP {error.code}).") from error
 
 
 def require_shared_write_password(candidate: str | None) -> None:
@@ -144,7 +196,7 @@ def append_shared_data(payload: dict[str, Any], x_shared_data_password: str | No
     if not speaker_records and not average_records:
         raise HTTPException(status_code=422, detail="공유할 유효한 모음값이 없습니다.")
     with SHARED_DATA_LOCK:
-        current = read_shared_data()
+        current, sha = read_shared_data_with_sha()
         speaker_by_id = {item["id"]: item for item in current["speakerData"]}
         for item in speaker_records:
             speaker_by_id.setdefault(item["id"], item)
@@ -152,7 +204,7 @@ def append_shared_data(payload: dict[str, Any], x_shared_data_password: str | No
         for item in average_records:
             average_by_key.setdefault((item["age"], item["gender"], item["vowel"]), item)
         merged = {"speakerData": list(speaker_by_id.values()), "averageData": list(average_by_key.values())}
-        write_shared_data(merged)
+        write_shared_data(merged, sha)
     return {"ok": True, **merged}
 
 
@@ -160,9 +212,9 @@ def append_shared_data(payload: dict[str, Any], x_shared_data_password: str | No
 def delete_shared_data(payload: dict[str, Any], x_shared_data_password: str | None = Header(default=None)) -> dict[str, Any]:
     require_shared_write_password(x_shared_data_password)
     with SHARED_DATA_LOCK:
-        current = read_shared_data()
+        current, sha = read_shared_data_with_sha()
         if payload.get("all") is True:
-            merged = {"speakerData": [], "averageData": []}
+            merged = empty_shared_data()
         else:
             speaker_ids = {str(item) for item in payload.get("speakerIds", []) if item}
             average_keys = {
@@ -174,7 +226,7 @@ def delete_shared_data(payload: dict[str, Any], x_shared_data_password: str | No
                 "speakerData": [item for item in current["speakerData"] if item["id"] not in speaker_ids],
                 "averageData": [item for item in current["averageData"] if (item["age"], item["gender"], item["vowel"]) not in average_keys],
             }
-        write_shared_data(merged)
+        write_shared_data(merged, sha)
     return {"ok": True, **merged}
 
 
