@@ -11,6 +11,16 @@ services:
     envVars:
       - key: CORS_ORIGINS
         value: https://ness-96.github.io
+      - key: GITHUB_REPOSITORY
+        value: ness-96/KoreanVowel
+      - key: GITHUB_DATA_PATH
+        value: data/shared-vowel-data.json
+      - key: GITHUB_BRANCH
+        value: main
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: SHARED_DATA_PASSWORD
+        sync: false
 
 
 
