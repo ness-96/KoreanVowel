@@ -151,3 +151,6 @@ revoke all on function public.delete_vowel_tokens(text[], boolean) from public, 
 grant execute on function public.vowel_token_json() to service_role;
 grant execute on function public.append_vowel_batch(text, text, jsonb) to service_role;
 grant execute on function public.delete_vowel_tokens(text[], boolean) to service_role;
+
+grant select on public.vowel_batches to service_role;
+grant select on public.vowel_tokens to service_role;
