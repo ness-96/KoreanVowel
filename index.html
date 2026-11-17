@@ -144,6 +144,14 @@
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
     .panel { padding: 19px; }
     .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+    .filter-panel { padding: 0; overflow: hidden; }
+    .filter-toggle { width: 100%; margin: 0; padding: 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+    .filter-toggle:hover { background: #fbfcfe; }
+    .filter-toggle:focus-visible { outline: 2px solid #7ea3ee; outline-offset: -2px; }
+    .filter-toggle-label { min-width: 0; }
+    .filter-toggle-icon { flex: 0 0 auto; color: #718096; font-size: 20px; line-height: 1; }
+    .filter-panel-body { padding: 0 19px 19px; }
+    .filter-panel-body[hidden] { display: none; }
     .panel-title { font-size: 15px; font-weight: 800; letter-spacing: -.03em; }
     .panel-caption { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .section-label { display: block; color: #708097; font-size: 11px; font-weight: 800; margin: 15px 0 8px; }
@@ -317,36 +325,36 @@
       </section>
 
       <aside class="sidebar">
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">분포 필터</div>
-              <div class="panel-caption">성별과 연령대별로 표시 범위를 바꿉니다.</div>
+        <section class="panel filter-panel">
+          <button class="panel-head filter-toggle" type="button" id="filterToggle" aria-expanded="false" aria-controls="filterPanelBody">
+            <span class="filter-toggle-label"><span class="panel-title">분포 필터</span></span>
+            <span class="filter-toggle-icon" id="filterToggleIcon" aria-hidden="true">＋</span>
+          </button>
+          <div class="filter-panel-body" id="filterPanelBody" hidden>
+            <span class="section-label">성별</span>
+            <div class="segmented" id="genderFilter">
+              <button class="active" data-gender="all">전체</button>
+              <button data-gender="female">여성</button>
+              <button data-gender="male">남성</button>
             </div>
+            <span class="section-label">연령대</span>
+            <div class="age-grid" id="ageFilter">
+              <button class="age-button active" data-age="all">전체</button>
+              <button class="age-button" data-age="평균">평균</button>
+              <button class="age-button" data-age="10대">10대</button>
+              <button class="age-button" data-age="20대">20대</button>
+              <button class="age-button" data-age="30대">30대</button>
+              <button class="age-button" data-age="40대">40대</button>
+              <button class="age-button" data-age="50대">50대</button>
+              <button class="age-button" data-age="60대">60대</button>
+              <button class="age-button" data-age="70대">70대</button>
+            </div>
+            <span class="section-label">화자 모음 모양</span>
+            <select class="speaker-select" id="speakerShapeSelect">
+              <option value="all">화자 선택</option>
+            </select>
+            <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
           </div>
-          <span class="section-label">성별</span>
-          <div class="segmented" id="genderFilter">
-            <button class="active" data-gender="all">전체</button>
-            <button data-gender="female">여성</button>
-            <button data-gender="male">남성</button>
-          </div>
-          <span class="section-label">연령대</span>
-          <div class="age-grid" id="ageFilter">
-            <button class="age-button active" data-age="all">전체</button>
-            <button class="age-button" data-age="평균">평균</button>
-            <button class="age-button" data-age="10대">10대</button>
-            <button class="age-button" data-age="20대">20대</button>
-            <button class="age-button" data-age="30대">30대</button>
-            <button class="age-button" data-age="40대">40대</button>
-            <button class="age-button" data-age="50대">50대</button>
-            <button class="age-button" data-age="60대">60대</button>
-            <button class="age-button" data-age="70대">70대</button>
-          </div>
-          <span class="section-label">화자 모음 모양</span>
-          <select class="speaker-select" id="speakerShapeSelect">
-            <option value="all">화자 선택</option>
-          </select>
-          <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
         </section>
 
         <section class="panel mic-panel">
@@ -1433,6 +1441,16 @@
     document.getElementById('micToggleBtn').addEventListener('click', toggleContinuousMic);
     window.addEventListener('beforeunload', () => { if (micStream) pauseContinuousMic(); });
     window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
+    const filterToggle = document.getElementById('filterToggle');
+    const filterPanelBody = document.getElementById('filterPanelBody');
+    const filterToggleIcon = document.getElementById('filterToggleIcon');
+    filterToggle.addEventListener('click', () => {
+      const expanded = filterToggle.getAttribute('aria-expanded') === 'true';
+      filterToggle.setAttribute('aria-expanded', String(!expanded));
+      filterPanelBody.hidden = expanded;
+      filterToggleIcon.textContent = expanded ? '＋' : '−';
+    });
+
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedGender = button.dataset.gender;
