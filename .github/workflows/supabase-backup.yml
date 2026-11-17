@@ -6,13 +6,23 @@ on:
     - cron: '17 15 * * *'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   export:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Clone private backup repository
+        env:
+          BACKUP_REPO_SSH_KEY: ${{ secrets.BACKUP_REPO_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/korean-vowel-backup ~/.ssh
+          printf '%s\n' "$BACKUP_REPO_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+          git clone --depth 1 git@github.com:ness-96/KoreanVowel-backup.git /tmp/korean-vowel-backup/repo
       - name: Export active token rows
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -23,7 +33,7 @@ jobs:
           curl --fail --silent --show-error \
             -H "apikey: ${SUPABASE_SERVICE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-            "${SUPABASE_URL}/rest/v1/vowel_tokens?select=id,speaker_id,region,gender,age,vowel,f1,f2,token_no,source,batch_id,created_at&deleted_at=is.null&order=created_at.asc,id.asc" \
+            "${SUPABASE_URL}/rest/v1/vowel_tokens?select=id,speaker_id,region,country,nationality,gender,age,vowel,f1,f2,token_no,source,batch_id,created_at&deleted_at=is.null&order=created_at.asc,id.asc" \
             > /tmp/korean-vowel-backup/tokens.json
       - name: Build anonymized backup
         env:
@@ -51,6 +61,8 @@ jobs:
               id: row.id,
               speakerId: anonymize(row.speaker_id),
               region: row.region,
+              country: row.country || '',
+              nationality: row.nationality || '',
               gender: row.gender,
               age: row.age,
               vowel: row.vowel,
@@ -65,17 +77,16 @@ jobs:
           };
           fs.writeFileSync('/tmp/korean-vowel-backup/shared-vowel-data.json', JSON.stringify(backup, null, 2) + '\n');
           NODE
-      - name: Commit backup to data-backups branch
+      - name: Commit backup to private repository
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin data-backups:data-backups || true
-          git checkout -B data-backups
-          mkdir -p data/supabase-backups
+          repo=/tmp/korean-vowel-backup/repo
+          git -C "$repo" config user.name "github-actions[bot]"
+          git -C "$repo" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p "$repo/data/supabase-backups"
           stamp=$(date -u +%Y%m%dT%H%M%SZ)
-          cp /tmp/korean-vowel-backup/shared-vowel-data.json "data/supabase-backups/shared-vowel-data-${stamp}.json"
-          cp /tmp/korean-vowel-backup/shared-vowel-data.json data/supabase-backups/latest.json
-          git add data/supabase-backups
-          git commit -m "Backup Supabase vowel data ${stamp}" || exit 0
-          git push origin data-backups
+          cp /tmp/korean-vowel-backup/shared-vowel-data.json "$repo/data/supabase-backups/shared-vowel-data-${stamp}.json"
+          cp /tmp/korean-vowel-backup/shared-vowel-data.json "$repo/data/supabase-backups/latest.json"
+          git -C "$repo" add data/supabase-backups
+          git -C "$repo" commit -m "Backup Supabase vowel data ${stamp}" || exit 0
+          git -C "$repo" push origin main
