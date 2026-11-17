@@ -12,6 +12,7 @@ jobs:
   export:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Export active token rows
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
