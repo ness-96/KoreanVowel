@@ -144,14 +144,20 @@
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
     .panel { padding: 19px; }
     .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
-    .filter-panel { padding: 0; overflow: hidden; }
-    .filter-toggle { width: 100%; margin: 0; padding: 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
-    .filter-toggle:hover { background: #fbfcfe; }
-    .filter-toggle:focus-visible { outline: 2px solid #7ea3ee; outline-offset: -2px; }
-    .filter-toggle-label { min-width: 0; }
-    .filter-toggle-icon { flex: 0 0 auto; color: #718096; font-size: 20px; line-height: 1; }
-    .filter-panel-body { padding: 0 19px 19px; }
-    .filter-panel-body[hidden] { display: none; }
+    .filter-launch { margin: 0 26px 14px; }
+    .filter-launch-button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid #d9e2ef; border-radius: 10px; background: #f8faff; color: var(--navy); text-align: left; cursor: pointer; transition: .18s ease; }
+    .filter-launch-button:hover { border-color: #9eb7e8; background: #f2f6ff; }
+    .filter-launch-button:focus-visible { outline: 2px solid #7ea3ee; outline-offset: 2px; }
+    .filter-launch-title { font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .filter-launch-summary { min-width: 0; overflow: hidden; color: #718096; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .filter-launch-icon { margin-left: auto; color: #718096; font-size: 16px; line-height: 1; }
+    .filter-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(20, 29, 43, .42); }
+    .filter-backdrop.hidden { display: none; }
+    .filter-dialog { width: min(360px, 100%); max-height: min(560px, calc(100vh - 32px)); overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 24px 70px rgba(22, 35, 58, .28); }
+    .filter-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .filter-dialog-close { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #718096; font-size: 18px; line-height: 1; cursor: pointer; }
+    .filter-dialog-close:hover { background: #f7f9fc; }
+    .filter-dialog-body { margin-top: 2px; }
     .protected-panel { padding: 0; overflow: hidden; }
     .panel-toggle { width: 100%; margin: 0; padding: 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
     .panel-toggle:hover { background: #fbfcfe; }
@@ -175,7 +181,6 @@
     .age-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .age-button.active { color: var(--navy); background: #eaf1ff; border-color: #a9c1f5; }
     .filter-summary { margin-top: 14px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #65748a; font-size: 11px; line-height: 1.5; }
-
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
     .field.full { grid-column: 1 / -1; }
     .batch-input-heading { display: flex; align-items: baseline; justify-content: space-between; margin-top: 15px; color: #708097; font-size: 11px; font-weight: 800; }
@@ -307,6 +312,14 @@
           </div>
         </div>
 
+        <div class="filter-launch">
+          <button class="filter-launch-button" type="button" id="filterToggle" aria-haspopup="dialog" aria-controls="filterModal">
+            <span class="filter-launch-title">분포 필터</span>
+            <span class="filter-launch-summary" id="filterSummaryText">전체 · 전체 · 모음 전체</span>
+            <span class="filter-launch-icon" aria-hidden="true">⌄</span>
+          </button>
+        </div>
+
         <div class="chart-wrap" id="chartWrap">
           <svg id="chart" viewBox="0 0 880 610" role="img" aria-label="F1 F2 모음 분포도">
             <defs>
@@ -334,38 +347,6 @@
       </section>
 
       <aside class="sidebar">
-        <section class="panel filter-panel">
-          <button class="panel-head filter-toggle" type="button" id="filterToggle" aria-expanded="false" aria-controls="filterPanelBody">
-            <span class="filter-toggle-label"><span class="panel-title">분포 필터</span></span>
-            <span class="filter-toggle-icon" id="filterToggleIcon" aria-hidden="true">＋</span>
-          </button>
-          <div class="filter-panel-body" id="filterPanelBody" hidden>
-            <span class="section-label">성별</span>
-            <div class="segmented" id="genderFilter">
-              <button class="active" data-gender="all">전체</button>
-              <button data-gender="female">여성</button>
-              <button data-gender="male">남성</button>
-            </div>
-            <span class="section-label">연령대</span>
-            <div class="age-grid" id="ageFilter">
-              <button class="age-button active" data-age="all">전체</button>
-              <button class="age-button" data-age="평균">평균</button>
-              <button class="age-button" data-age="10대">10대</button>
-              <button class="age-button" data-age="20대">20대</button>
-              <button class="age-button" data-age="30대">30대</button>
-              <button class="age-button" data-age="40대">40대</button>
-              <button class="age-button" data-age="50대">50대</button>
-              <button class="age-button" data-age="60대">60대</button>
-              <button class="age-button" data-age="70대">70대</button>
-            </div>
-            <span class="section-label">화자 모음 모양</span>
-            <select class="speaker-select" id="speakerShapeSelect">
-              <option value="all">화자 선택</option>
-            </select>
-            <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
-          </div>
-        </section>
-
         <section class="panel mic-panel">
           <div class="panel-head">
             <div>
@@ -477,6 +458,43 @@
     </main>
   </div>
 
+  <div class="filter-backdrop hidden" id="filterModal" role="dialog" aria-modal="true" aria-labelledby="filterModalTitle">
+    <div class="filter-dialog">
+      <div class="filter-dialog-head">
+        <div>
+          <div class="panel-title" id="filterModalTitle">분포 필터</div>
+          <div class="panel-caption">성별·연령대·화자 모양을 선택합니다.</div>
+        </div>
+        <button class="filter-dialog-close" type="button" id="filterCloseBtn" aria-label="분포 필터 닫기">×</button>
+      </div>
+      <div class="filter-dialog-body">
+        <span class="section-label">성별</span>
+        <div class="segmented" id="genderFilter">
+          <button class="active" data-gender="all">전체</button>
+          <button data-gender="female">여성</button>
+          <button data-gender="male">남성</button>
+        </div>
+        <span class="section-label">연령대</span>
+        <div class="age-grid" id="ageFilter">
+          <button class="age-button active" data-age="all">전체</button>
+          <button class="age-button" data-age="평균">평균</button>
+          <button class="age-button" data-age="10대">10대</button>
+          <button class="age-button" data-age="20대">20대</button>
+          <button class="age-button" data-age="30대">30대</button>
+          <button class="age-button" data-age="40대">40대</button>
+          <button class="age-button" data-age="50대">50대</button>
+          <button class="age-button" data-age="60대">60대</button>
+          <button class="age-button" data-age="70대">70대</button>
+        </div>
+        <span class="section-label">화자 모음 모양</span>
+        <select class="speaker-select" id="speakerShapeSelect">
+          <option value="all">화자 선택</option>
+        </select>
+        <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="confirm-backdrop hidden" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
     <div class="confirm-dialog">
       <div class="confirm-title" id="deleteConfirmTitle">데이터를 정말 삭제하시겠습니까?</div>
@@ -510,6 +528,7 @@
     const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ','ㅡ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
     const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || 'https://korean-vowel-formant-api.onrender.com';
+    const SHARED_DATA_API_URL = new URLSearchParams(location.search).get('sharedApi') || FORMANT_API_URL;
     const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     const AVERAGE_STORAGE_KEY = 'vowel-space-prototype-v2-averages';
@@ -544,6 +563,8 @@
     let pendingProtectedPanel = null;
     let protectedPanelSessionPassword = '';
     let sharedDataError = '';
+    let sharedDataState = 'loading';
+    let sharedRecordIds = new Set();
     const PROTECTED_PANEL_PASSWORD_HASH = 'bc89bdbb880e891b152199ab67b2f8d930875469bc74f0c07e2e3dcd978845df';
 
     const svg = document.getElementById('chart');
@@ -989,12 +1010,25 @@
       tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
     }
     function hideTooltip() { tooltip.classList.add('hidden'); }
+    function updateFilterSummary() {
+      const genderLabel = selectedGender === 'all' ? '성별 전체' : selectedGender === 'female' ? '여성' : '남성';
+      const ageLabel = selectedAge === 'all' ? '연령 전체' : selectedAge === 'average' ? '평균' : selectedAge;
+      const vowelLabel = selectedVowel === 'all' ? '모음 전체' : '모음 ' + selectedVowel;
+      const speakerLabel = selectedSpeaker === 'all' ? '' : ' · ' + selectedSpeaker;
+      const summary = genderLabel + ' · ' + ageLabel + ' · ' + vowelLabel + speakerLabel;
+      const target = document.getElementById('filterSummaryText');
+      if (target) target.textContent = summary;
+    }
     function updateStats(visibleCount, visibleAverageCount) {
       document.getElementById('recordCount').textContent = data.length;
       document.getElementById('speakerCount').textContent = new Set(data.map(d => d.speakerId)).size;
       document.getElementById('vowelCount').textContent = new Set(data.map(d => d.vowel)).size;
       document.getElementById('averageCount').textContent = averageData.length;
-      document.getElementById('dataStatus').textContent = `${data.length}개 토큰 · ${new Set(data.map(d => d.speakerId)).size}명 · 평균 ${averageData.length}개`;
+      const sharedLabel = sharedDataState === 'ready' ? '공유 연결됨' : sharedDataState === 'error' ? '공유 연결 오류' : '공유 확인 중';
+      const dataStatus = document.getElementById('dataStatus');
+      dataStatus.textContent = data.length + '개 토큰 · ' + new Set(data.map(d => d.speakerId)).size + '명 · 평균 ' + averageData.length + '개 · ' + sharedLabel;
+      dataStatus.title = sharedDataError || '공유 데이터 상태: ' + sharedLabel;
+      updateFilterSummary();
     }
     function updateMicPrompt() {
       const vowel = document.getElementById('micVowel').value;
@@ -1475,14 +1509,20 @@
     window.addEventListener('beforeunload', () => { if (micStream) pauseContinuousMic(); });
     window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
     const filterToggle = document.getElementById('filterToggle');
-    const filterPanelBody = document.getElementById('filterPanelBody');
-    const filterToggleIcon = document.getElementById('filterToggleIcon');
-    filterToggle.addEventListener('click', () => {
-      const expanded = filterToggle.getAttribute('aria-expanded') === 'true';
-      filterToggle.setAttribute('aria-expanded', String(!expanded));
-      filterPanelBody.hidden = expanded;
-      filterToggleIcon.textContent = expanded ? '＋' : '−';
-    });
+    const filterModal = document.getElementById('filterModal');
+    const filterCloseBtn = document.getElementById('filterCloseBtn');
+    function openFilterModal() {
+      filterModal.classList.remove('hidden');
+      filterToggle.setAttribute('aria-expanded', 'true');
+      filterCloseBtn.focus();
+    }
+    function closeFilterModal() {
+      filterModal.classList.add('hidden');
+      filterToggle.setAttribute('aria-expanded', 'false');
+    }
+    filterToggle.addEventListener('click', openFilterModal);
+    filterCloseBtn.addEventListener('click', closeFilterModal);
+    filterModal.addEventListener('click', e => { if (e.target === filterModal) closeFilterModal(); });
 
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
@@ -1491,6 +1531,7 @@
       selectedSpeaker = 'all';
       selectedVowel = 'all';
       document.querySelectorAll('#genderFilter button').forEach(b => b.classList.toggle('active', b === button));
+      updateFilterSummary();
       render();
     });
     document.getElementById('ageFilter').addEventListener('click', e => {
@@ -1500,68 +1541,79 @@
       selectedSpeaker = 'all';
       selectedVowel = 'all';
       document.querySelectorAll('#ageFilter button').forEach(b => b.classList.toggle('active', b === button));
+      updateFilterSummary();
       render();
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
       selectedSpeaker = e.target.value;
       selectedAverageSeries = 'all';
       selectedVowel = 'all';
+      updateFilterSummary();
       render();
     });
 
     function sharedDataEndpoint() {
-      return FORMANT_API_URL.replace(/\/$/, '') + '/shared-data';
+      return SHARED_DATA_API_URL.replace(/\/$/, '') + '/shared-data';
+    }
+    function mergeSharedSpeakerData(remoteRecords) {
+      const remote = normalizeData(Array.isArray(remoteRecords) ? remoteRecords : []);
+      const remoteIds = new Set(remote.map(item => item.id));
+      const localOnly = data.filter(item => !sharedRecordIds.has(item.id) && !remoteIds.has(item.id));
+      data = normalizeData([...localOnly, ...remote]);
+      sharedRecordIds = new Set(remote.map(item => item.id));
+      saveData();
     }
     function applySharedDataPayload(payload) {
-      data = normalizeData(Array.isArray(payload && payload.speakerData) ? payload.speakerData : []);
-      averageData = normalizeAverageData(Array.isArray(payload && payload.averageData) ? payload.averageData : []);
-      saveData();
+      mergeSharedSpeakerData(payload && payload.speakerData);
+      averageData = normalizeAverageData(averageData);
       saveAverageData();
+      render();
     }
     async function loadSharedData() {
       try {
         const response = await fetch(sharedDataEndpoint());
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 파일을 읽지 못했습니다.');
-        const remoteSpeakerData = normalizeData(Array.isArray(payload.speakerData) ? payload.speakerData : []);
-        const remoteAverageData = normalizeAverageData(Array.isArray(payload.averageData) ? payload.averageData : []);
-        const speakerById = new Map(data.map(item => [item.id, item]));
-        remoteSpeakerData.forEach(item => speakerById.set(item.id, item));
-        const averageByKey = new Map(averageData.map(item => [item.age + '::' + item.gender + '::' + item.vowel, item]));
-        remoteAverageData.forEach(item => averageByKey.set(item.age + '::' + item.gender + '::' + item.vowel, item));
-        data = normalizeData([...speakerById.values()]);
-        averageData = normalizeAverageData([...averageByKey.values()]);
-        saveData();
-        saveAverageData();
+        if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소를 읽지 못했습니다.');
+        mergeSharedSpeakerData(payload.speakerData);
+        sharedDataState = 'ready';
         sharedDataError = '';
         render();
       } catch (error) {
-        sharedDataError = error && error.message ? error.message : '공유 데이터 파일을 읽지 못했습니다.';
+        sharedDataState = 'error';
+        sharedDataError = error && error.message ? error.message : '공유 데이터 저장소를 읽지 못했습니다.';
+        render();
       }
     }
-    async function appendSharedData() {
+    async function appendSharedData(records, batchId = '') {
       if (!protectedPanelSessionPassword) throw new Error('공유 데이터 쓰기 권한을 먼저 확인해 주세요.');
+      const safeBatchId = batchId || ('batch-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
       const response = await fetch(sharedDataEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Shared-Data-Password': protectedPanelSessionPassword },
-        body: JSON.stringify({ speakerData: data, averageData })
+        body: JSON.stringify({ batchId: safeBatchId, clientRequestId: safeBatchId, speakerData: records })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 파일에 저장하지 못했습니다.');
-      applySharedDataPayload(payload);
+      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소에 저장하지 못했습니다.');
+      mergeSharedSpeakerData(payload.speakerData);
+      sharedDataState = 'ready';
       sharedDataError = '';
+      render();
+      return payload;
     }
     async function deleteSharedData(options = {}) {
       if (!protectedPanelSessionPassword) throw new Error('공유 데이터 쓰기 권한을 먼저 확인해 주세요.');
       const response = await fetch(sharedDataEndpoint(), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', 'X-Shared-Data-Password': protectedPanelSessionPassword },
-        body: JSON.stringify(options)
+        body: JSON.stringify({ all: options.all === true, speakerIds: Array.isArray(options.speakerIds) ? options.speakerIds : [] })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 파일을 수정하지 못했습니다.');
-      applySharedDataPayload(payload);
+      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소를 수정하지 못했습니다.');
+      mergeSharedSpeakerData(payload.speakerData);
+      sharedDataState = 'ready';
       sharedDataError = '';
+      render();
+      return payload;
     }
 
     async function hashProtectedPanelPassword(value) {
@@ -1732,13 +1784,7 @@
           return;
         }
         averageData.push(...newItems);
-        try {
-          await appendSharedData();
-        } catch (error) {
-          formMessage.textContent = '공유 저장에 실패했습니다: ' + (error.message || '알 수 없는 오류');
-          formMessage.classList.add('visible', 'error');
-          return;
-        }
+        saveAverageData();
         e.target.reset();
         document.getElementById('gender').value = 'female';
         document.getElementById('age').value = '20대';
@@ -1765,9 +1811,9 @@
         tokenNo: nextTokenNumber(speakerId, vowel),
         source: 'manual'
       }));
-      data.push(...newItems);
+      let savedPayload;
       try {
-        await appendSharedData();
+        savedPayload = await appendSharedData(newItems);
       } catch (error) {
         formMessage.textContent = '공유 저장에 실패했습니다: ' + (error.message || '알 수 없는 오류');
         formMessage.classList.add('visible', 'error');
@@ -1843,13 +1889,6 @@
       const item = averageData.find(d => d.id === id);
       if (!item) return;
       openDeleteConfirm(`${item.age} ${item.gender === 'female' ? '여성' : '남성'}의 ${item.vowel} 평균값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, async () => {
-        try {
-          await deleteSharedData({ averageKeys: [{ age: item.age, gender: item.gender, vowel: item.vowel }] });
-        } catch (error) {
-          document.getElementById('formMessage').textContent = '공유 삭제에 실패했습니다: ' + (error.message || '알 수 없는 오류');
-          document.getElementById('formMessage').className = 'form-message visible error';
-          return;
-        }
         averageData = averageData.filter(d => d.id !== id);
         saveAverageData();
         render();
