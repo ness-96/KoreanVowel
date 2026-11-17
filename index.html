@@ -376,7 +376,7 @@
             <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
           </div>
           <div class="mic-spectrum-panel">
-            <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–5000 Hz</span></div>
+            <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
             <canvas id="micSpectrum" width="620" height="170" aria-label="녹음 주파수 스펙트럼"></canvas>
             <div class="mic-spectrum-note" id="micSpectrumNote">마이크를 켜면 실시간 스펙트럼과 서버 Praat/Parselmouth F1·F2가 표시됩니다.</div>
           </div>
@@ -1061,7 +1061,7 @@
       const dbMax = 0;
       const sampleRate = Number(snapshot && snapshot.sampleRate) || 16000;
       const nyquist = sampleRate / 2;
-      const maxFrequency = Math.min(5000, nyquist);
+      const maxFrequency = Math.min(3000, nyquist);
       const frames = snapshot && Array.isArray(snapshot.frames)
         ? snapshot.frames.filter(frame => frame && typeof frame.length === 'number' && frame.length > 0)
         : [];
