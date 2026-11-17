@@ -152,6 +152,15 @@
     .filter-toggle-icon { flex: 0 0 auto; color: #718096; font-size: 20px; line-height: 1; }
     .filter-panel-body { padding: 0 19px 19px; }
     .filter-panel-body[hidden] { display: none; }
+    .protected-panel { padding: 0; overflow: hidden; }
+    .panel-toggle { width: 100%; margin: 0; padding: 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+    .panel-toggle:hover { background: #fbfcfe; }
+    .panel-toggle:focus-visible { outline: 2px solid #7ea3ee; outline-offset: -2px; }
+    .panel-toggle-label { min-width: 0; }
+    .panel-toggle-label .panel-caption { display: block; }
+    .panel-toggle-icon { flex: 0 0 auto; color: #718096; font-size: 20px; line-height: 1; }
+    .panel-body { padding: 0 19px 19px; }
+    .panel-body[hidden] { display: none; }
     .panel-title { font-size: 15px; font-weight: 800; letter-spacing: -.03em; }
     .panel-caption { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .section-label { display: block; color: #708097; font-size: 11px; font-weight: 800; margin: 15px 0 8px; }
@@ -396,66 +405,72 @@
           <div class="data-note">마이크를 켜면 계속 듣습니다. 음성 구간을 약 1초마다 서버로 보내 Praat/Parselmouth F1·F2를 갱신하며, 일시정지하면 전송을 멈춥니다.</div>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">모음 값 일괄 추가</div>
-              <div class="panel-caption" id="pointFormCaption">한 화자의 모음값을 입력합니다. 비워 둔 모음은 건너뛰며, 같은 모음의 반복 입력은 별도 토큰으로 저장됩니다.</div>
-            </div>
+        <section class="panel protected-panel">
+          <button class="panel-head panel-toggle" type="button" id="pointFormToggle" aria-expanded="false" aria-controls="pointFormBody">
+            <span class="panel-toggle-label">
+              <span class="panel-title">모음 값 일괄 추가</span>
+              <span class="panel-caption">새 모음값 입력</span>
+            </span>
+            <span class="panel-toggle-icon" id="pointFormToggleIcon" aria-hidden="true">＋</span>
+          </button>
+          <div class="panel-body" id="pointFormBody" hidden>
+            <form id="pointForm">
+              <div class="form-grid">
+                <div class="field" id="speakerIdField"><label for="speakerId">화자 ID</label><input id="speakerId" placeholder="예: K101" /></div>
+                <div class="field" id="regionField"><label for="region">지역</label><select id="region">
+                  <option value="">지역을 선택하세요</option>
+                  <option value="서울">서울</option>
+                  <option value="경기">경기</option>
+                  <option value="강원">강원</option>
+                  <option value="충북">충북</option>
+                  <option value="충남">충남</option>
+                  <option value="전북">전북</option>
+                  <option value="전남">전남</option>
+                  <option value="경북">경북</option>
+                  <option value="경남">경남</option>
+                  <option value="제주">제주</option>
+                  <option value="해외">해외</option>
+                </select></div>
+                <div class="field full" id="overseasCountryField" hidden><label for="overseasCountry">해외 국가</label><input id="overseasCountry" placeholder="예: 미국" /></div>
+                <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
+                <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
+                <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
+              </div>
+              <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
+              <div class="batch-input-grid" id="batchInputGrid"></div>
+              <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
+              <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
+              <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
+              <div class="data-note" id="inputRuleNote">같은 화자 ID의 같은 모음도 반복 입력할 수 있습니다. 입력할 때마다 별도의 반복 토큰으로 저장됩니다.</div>
+            </form>
           </div>
-          <form id="pointForm">
-            <div class="form-grid">
-              <div class="field" id="speakerIdField"><label for="speakerId">화자 ID</label><input id="speakerId" placeholder="예: K101" /></div>
-              <div class="field" id="regionField"><label for="region">지역</label><select id="region">
-                <option value="">지역을 선택하세요</option>
-                <option value="서울">서울</option>
-                <option value="경기">경기</option>
-                <option value="강원">강원</option>
-                <option value="충북">충북</option>
-                <option value="충남">충남</option>
-                <option value="전북">전북</option>
-                <option value="전남">전남</option>
-                <option value="경북">경북</option>
-                <option value="경남">경남</option>
-                <option value="제주">제주</option>
-                <option value="해외">해외</option>
-              </select></div>
-              <div class="field full" id="overseasCountryField" hidden><label for="overseasCountry">해외 국가</label><input id="overseasCountry" placeholder="예: 미국" /></div>
-              <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
-              <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
-              <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
-            </div>
-            <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
-            <div class="batch-input-grid" id="batchInputGrid"></div>
-            <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
-            <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
-            <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
-            <div class="data-note" id="inputRuleNote">같은 화자 ID의 같은 모음도 반복 입력할 수 있습니다. 입력할 때마다 별도의 반복 토큰으로 저장됩니다.</div>
-          </form>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">데이터 삭제</div>
-              <div class="panel-caption">지정한 화자 전체 또는 특정 모음값을 삭제합니다.</div>
+        <section class="panel protected-panel">
+          <button class="panel-head panel-toggle" type="button" id="deletePanelToggle" aria-expanded="false" aria-controls="deletePanelBody">
+            <span class="panel-toggle-label">
+              <span class="panel-title">데이터 삭제</span>
+              <span class="panel-caption">저장된 모음값 관리</span>
+            </span>
+            <span class="panel-toggle-icon" id="deletePanelToggleIcon" aria-hidden="true">＋</span>
+          </button>
+          <div class="panel-body" id="deletePanelBody" hidden>
+            <div class="field full">
+              <label for="deleteSpeakerSelect">화자 전체 삭제</label>
+              <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
             </div>
+            <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
+            <div class="field full" style="margin-top:12px;">
+              <label for="deleteValueSelect">특정 토큰 삭제</label>
+              <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
+            </div>
+            <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 토큰 삭제</button>
+            <div class="field full" style="margin-top:12px;">
+              <label for="deleteAverageSelect">평균값 삭제</label>
+              <select class="speaker-select" id="deleteAverageSelect"><option value="">평균값을 선택하세요</option></select>
+            </div>
+            <button class="secondary-button danger-button" type="button" id="deleteAverageBtn">선택 평균값 삭제</button>
           </div>
-          <div class="field full">
-            <label for="deleteSpeakerSelect">화자 전체 삭제</label>
-            <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
-          <div class="field full" style="margin-top:12px;">
-            <label for="deleteValueSelect">특정 토큰 삭제</label>
-            <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 토큰 삭제</button>
-          <div class="field full" style="margin-top:12px;">
-            <label for="deleteAverageSelect">평균값 삭제</label>
-            <select class="speaker-select" id="deleteAverageSelect"><option value="">평균값을 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteAverageBtn">선택 평균값 삭제</button>
         </section>
 
       </aside>
@@ -472,6 +487,20 @@
       <div class="confirm-actions">
         <button class="secondary-button" type="button" id="deleteCancelBtn">취소</button>
         <button class="secondary-button confirm-danger" type="button" id="deleteConfirmBtn" disabled>삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-backdrop hidden" id="panelPasswordModal" role="dialog" aria-modal="true" aria-labelledby="panelPasswordTitle">
+    <div class="confirm-dialog">
+      <div class="confirm-title" id="panelPasswordTitle">관리자 확인</div>
+      <div class="confirm-description">새 모음값 입력과 데이터 삭제 기능을 열려면 비밀번호를 입력하세요.</div>
+      <label class="confirm-label" for="panelPasswordInput">비밀번호</label>
+      <input class="confirm-input" id="panelPasswordInput" type="password" autocomplete="current-password" spellcheck="false" />
+      <div class="confirm-message" id="panelPasswordMessage">비밀번호를 입력하면 해당 패널이 열립니다.</div>
+      <div class="confirm-actions">
+        <button class="secondary-button" type="button" id="panelPasswordCancel">취소</button>
+        <button class="submit-button" type="button" id="panelPasswordSubmit">확인</button>
       </div>
     </div>
   </div>
@@ -512,6 +541,8 @@
     let micContinuousGeneration = 0;
     let micLastLiveError = "";
     let pendingDeletion = null;
+    let pendingProtectedPanel = null;
+    const PROTECTED_PANEL_PASSWORD_HASH = 'bc89bdbb880e891b152199ab67b2f8d930875469bc74f0c07e2e3dcd978845df';
 
     const svg = document.getElementById('chart');
     const plotContent = document.getElementById('plotContent');
@@ -1476,6 +1507,58 @@
       render();
     });
 
+    async function hashProtectedPanelPassword(value) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    function setProtectedPanelExpanded(config, expanded) {
+      const toggle = document.getElementById(config.toggleId);
+      const body = document.getElementById(config.bodyId);
+      const icon = document.getElementById(config.iconId);
+      toggle.setAttribute('aria-expanded', String(expanded));
+      body.hidden = !expanded;
+      icon.textContent = expanded ? '−' : '＋';
+    }
+    function closePanelPasswordModal() {
+      document.getElementById('panelPasswordModal').classList.add('hidden');
+      document.getElementById('panelPasswordInput').value = '';
+      document.getElementById('panelPasswordMessage').textContent = '비밀번호를 입력하면 해당 패널이 열립니다.';
+      pendingProtectedPanel = null;
+    }
+    function openPanelPasswordModal(config) {
+      pendingProtectedPanel = config;
+      document.getElementById('panelPasswordInput').value = '';
+      document.getElementById('panelPasswordMessage').textContent = '비밀번호를 입력하면 해당 패널이 열립니다.';
+      document.getElementById('panelPasswordModal').classList.remove('hidden');
+      document.getElementById('panelPasswordInput').focus();
+    }
+    function requestProtectedPanel(config) {
+      const toggle = document.getElementById(config.toggleId);
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      if (expanded) {
+        setProtectedPanelExpanded(config, false);
+      } else {
+        openPanelPasswordModal(config);
+      }
+    }
+    async function verifyPanelPassword() {
+      const input = document.getElementById('panelPasswordInput');
+      const message = document.getElementById('panelPasswordMessage');
+      try {
+        const hash = await hashProtectedPanelPassword(input.value);
+        if (hash !== PROTECTED_PANEL_PASSWORD_HASH) {
+          message.textContent = '비밀번호가 맞지 않습니다.';
+          input.select();
+          return;
+        }
+        const config = pendingProtectedPanel;
+        closePanelPasswordModal();
+        if (config) setProtectedPanelExpanded(config, true);
+      } catch (error) {
+        message.textContent = '비밀번호 확인을 사용할 수 없습니다. HTTPS 페이지에서 다시 시도해 주세요.';
+      }
+    }
+
     function closeDeleteConfirm() {
       document.getElementById('deleteConfirmModal').classList.add('hidden');
       document.getElementById('deleteConfirmInput').value = '';
@@ -1490,6 +1573,19 @@
       document.getElementById('deleteConfirmModal').classList.remove('hidden');
       document.getElementById('deleteConfirmInput').focus();
     }
+    const pointFormPanelConfig = { toggleId: 'pointFormToggle', bodyId: 'pointFormBody', iconId: 'pointFormToggleIcon' };
+    const deletePanelConfig = { toggleId: 'deletePanelToggle', bodyId: 'deletePanelBody', iconId: 'deletePanelToggleIcon' };
+    document.getElementById('pointFormToggle').addEventListener('click', () => requestProtectedPanel(pointFormPanelConfig));
+    document.getElementById('deletePanelToggle').addEventListener('click', () => requestProtectedPanel(deletePanelConfig));
+    document.getElementById('panelPasswordSubmit').addEventListener('click', verifyPanelPassword);
+    document.getElementById('panelPasswordCancel').addEventListener('click', closePanelPasswordModal);
+    document.getElementById('panelPasswordModal').addEventListener('click', e => {
+      if (e.target.id === 'panelPasswordModal') closePanelPasswordModal();
+    });
+    document.getElementById('panelPasswordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') verifyPanelPassword();
+    });
+
     document.getElementById('deleteConfirmInput').addEventListener('input', e => {
       document.getElementById('deleteConfirmBtn').disabled = e.target.value !== '삭제';
     });
@@ -1504,7 +1600,9 @@
       if (e.target.id === 'deleteConfirmModal') closeDeleteConfirm();
     });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && !document.getElementById('deleteConfirmModal').classList.contains('hidden')) closeDeleteConfirm();
+      if (e.key !== 'Escape') return;
+      if (!document.getElementById('panelPasswordModal').classList.contains('hidden')) closePanelPasswordModal();
+      else if (!document.getElementById('deleteConfirmModal').classList.contains('hidden')) closeDeleteConfirm();
     });
 
     document.getElementById('pointForm').addEventListener('submit', e => {
