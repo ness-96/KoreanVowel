@@ -129,7 +129,29 @@ def github_contents_request(method: str, body: dict[str, Any] | None = None) -> 
     return json.loads(response_body) if response_body else {}
 
 
+def normalize_shared_payload(raw_payload: Any) -> dict[str, list[dict[str, Any]]]:
+    if not isinstance(raw_payload, dict):
+        raw_payload = {}
+    return {
+        "speakerData": normalize_shared_speaker_records(raw_payload.get("speakerData", [])),
+        "averageData": normalize_shared_average_records(raw_payload.get("averageData", [])),
+    }
+
+
 def read_shared_data_with_sha() -> tuple[dict[str, list[dict[str, Any]]], str | None]:
+    if not GITHUB_TOKEN:
+        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPOSITORY}/{urllib.parse.quote(GITHUB_BRANCH, safe='')}/{urllib.parse.quote(GITHUB_DATA_PATH, safe='/')}"
+        raw_request = urllib.request.Request(raw_url)
+        try:
+            with urllib.request.urlopen(raw_request, timeout=20) as response:
+                raw_payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return empty_shared_data(), None
+            raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 읽지 못했습니다 (HTTP {error.code}).") from error
+        except (urllib.error.URLError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise HTTPException(status_code=503, detail="GitHub 공유 파일을 읽지 못했습니다.") from error
+        return normalize_shared_payload(raw_payload), None
     try:
         github_file = github_contents_request("GET")
     except urllib.error.HTTPError as error:
@@ -142,13 +164,7 @@ def read_shared_data_with_sha() -> tuple[dict[str, list[dict[str, Any]]], str | 
         raw_payload = json.loads(decoded_content)
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
         raw_payload = {}
-    if not isinstance(raw_payload, dict):
-        raw_payload = {}
-    payload = {
-        "speakerData": normalize_shared_speaker_records(raw_payload.get("speakerData", [])),
-        "averageData": normalize_shared_average_records(raw_payload.get("averageData", [])),
-    }
-    return payload, str(github_file.get("sha")) if github_file.get("sha") else None
+    return normalize_shared_payload(raw_payload), str(github_file.get("sha")) if github_file.get("sha") else None
 
 
 def read_shared_data() -> dict[str, list[dict[str, Any]]]:
