@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hmac
 import json
+import threading
 import os
 import shutil
 import subprocess
@@ -10,7 +12,7 @@ from typing import Any
 
 import numpy as np
 import parselmouth
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Korean vowel formant analyzer", version="0.1.0")
@@ -32,9 +34,149 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=False,
-    allow_methods=["POST", "GET"],
+    allow_methods=["DELETE", "GET", "POST", "OPTIONS"],
     allow_headers=["*"]
 )
+
+
+SHARED_DATA_PATH = Path(os.getenv("SHARED_DATA_PATH", "/app/shared-vowel-data.json"))
+SHARED_DATA_PASSWORD = os.getenv("SHARED_DATA_PASSWORD", "")
+SHARED_DATA_LOCK = threading.Lock()
+SHARED_VOWELS = {"ㅣ", "ㅔ", "ㅐ", "ㅏ", "ㅓ", "ㅡ", "ㅗ", "ㅜ"}
+SHARED_RECORD_FIELDS = ("id", "speakerId", "region", "country", "nationality", "gender", "age", "vowel", "f1", "f2", "tokenNo", "source")
+
+
+def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
+    if not isinstance(records, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for raw in records:
+        if not isinstance(raw, dict):
+            continue
+        record_id = str(raw.get("id", "")).strip()
+        speaker_id = str(raw.get("speakerId", "")).strip()
+        vowel = str(raw.get("vowel", "")).strip()
+        try:
+            f1 = float(raw.get("f1"))
+            f2 = float(raw.get("f2"))
+        except (TypeError, ValueError):
+            continue
+        if not record_id or not speaker_id or vowel not in SHARED_VOWELS:
+            continue
+        if not np.isfinite(f1) or not np.isfinite(f2) or record_id in seen_ids:
+            continue
+        item = {key: raw[key] for key in SHARED_RECORD_FIELDS if key in raw}
+        item.update({"id": record_id, "speakerId": speaker_id, "vowel": vowel, "f1": f1, "f2": f2, "source": "manual"})
+        normalized.append(item)
+        seen_ids.add(record_id)
+    return normalized
+
+
+def normalize_shared_average_records(records: Any) -> list[dict[str, Any]]:
+    if not isinstance(records, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    for raw in records:
+        if not isinstance(raw, dict):
+            continue
+        age = str(raw.get("age", "")).strip()
+        gender = str(raw.get("gender", "")).strip()
+        vowel = str(raw.get("vowel", "")).strip()
+        try:
+            f1 = float(raw.get("f1"))
+            f2 = float(raw.get("f2"))
+        except (TypeError, ValueError):
+            continue
+        key = (age, gender, vowel)
+        if not age or gender not in {"female", "male"} or vowel not in SHARED_VOWELS or key in seen_keys:
+            continue
+        if not np.isfinite(f1) or not np.isfinite(f2):
+            continue
+        item = {"id": str(raw.get("id") or f"average-{age}-{gender}-{vowel}"), "age": age, "gender": gender, "vowel": vowel, "f1": f1, "f2": f2, "source": "average"}
+        normalized.append(item)
+        seen_keys.add(key)
+    return normalized
+
+
+def read_shared_data() -> dict[str, list[dict[str, Any]]]:
+    if not SHARED_DATA_PATH.exists():
+        return {"speakerData": [], "averageData": []}
+    try:
+        payload = json.loads(SHARED_DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {"speakerData": [], "averageData": []}
+    if not isinstance(payload, dict):
+        return {"speakerData": [], "averageData": []}
+    return {
+        "speakerData": normalize_shared_speaker_records(payload.get("speakerData", [])),
+        "averageData": normalize_shared_average_records(payload.get("averageData", [])),
+    }
+
+
+def write_shared_data(payload: dict[str, list[dict[str, Any]]]) -> None:
+    SHARED_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = SHARED_DATA_PATH.with_suffix(SHARED_DATA_PATH.suffix + ".tmp")
+    temporary_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary_path.replace(SHARED_DATA_PATH)
+
+
+def require_shared_write_password(candidate: str | None) -> None:
+    if not SHARED_DATA_PASSWORD:
+        raise HTTPException(status_code=503, detail="공유 데이터 쓰기 비밀번호가 서버에 설정되지 않았습니다.")
+    if not candidate or not hmac.compare_digest(candidate, SHARED_DATA_PASSWORD):
+        raise HTTPException(status_code=401, detail="공유 데이터 쓰기 권한이 없습니다.")
+
+
+@app.get("/shared-data")
+def get_shared_data() -> dict[str, Any]:
+    with SHARED_DATA_LOCK:
+        payload = read_shared_data()
+    return {"ok": True, **payload}
+
+
+@app.post("/shared-data")
+def append_shared_data(payload: dict[str, Any], x_shared_data_password: str | None = Header(default=None)) -> dict[str, Any]:
+    require_shared_write_password(x_shared_data_password)
+    speaker_records = normalize_shared_speaker_records(payload.get("speakerData", []))
+    average_records = normalize_shared_average_records(payload.get("averageData", []))
+    if not speaker_records and not average_records:
+        raise HTTPException(status_code=422, detail="공유할 유효한 모음값이 없습니다.")
+    with SHARED_DATA_LOCK:
+        current = read_shared_data()
+        speaker_by_id = {item["id"]: item for item in current["speakerData"]}
+        for item in speaker_records:
+            speaker_by_id.setdefault(item["id"], item)
+        average_by_key = {(item["age"], item["gender"], item["vowel"]): item for item in current["averageData"]}
+        for item in average_records:
+            average_by_key.setdefault((item["age"], item["gender"], item["vowel"]), item)
+        merged = {"speakerData": list(speaker_by_id.values()), "averageData": list(average_by_key.values())}
+        write_shared_data(merged)
+    return {"ok": True, **merged}
+
+
+@app.delete("/shared-data")
+def delete_shared_data(payload: dict[str, Any], x_shared_data_password: str | None = Header(default=None)) -> dict[str, Any]:
+    require_shared_write_password(x_shared_data_password)
+    with SHARED_DATA_LOCK:
+        current = read_shared_data()
+        if payload.get("all") is True:
+            merged = {"speakerData": [], "averageData": []}
+        else:
+            speaker_ids = {str(item) for item in payload.get("speakerIds", []) if item}
+            average_keys = {
+                (str(item.get("age", "")), str(item.get("gender", "")), str(item.get("vowel", "")))
+                for item in payload.get("averageKeys", [])
+                if isinstance(item, dict)
+            }
+            merged = {
+                "speakerData": [item for item in current["speakerData"] if item["id"] not in speaker_ids],
+                "averageData": [item for item in current["averageData"] if (item["age"], item["gender"], item["vowel"]) not in average_keys],
+            }
+        write_shared_data(merged)
+    return {"ok": True, **merged}
+
 
 def convert_to_wav(input_path: Path, output_path: Path) -> None:
     ffmpeg = shutil.which("ffmpeg")
