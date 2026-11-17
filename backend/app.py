@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import base64
 import hmac
 import json
-import threading
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,14 +42,12 @@ app.add_middleware(
 )
 
 
-GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "ness-96/KoreanVowel")
-GITHUB_DATA_PATH = os.getenv("GITHUB_DATA_PATH", "data/shared-vowel-data.json")
-GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SHARED_DATA_PASSWORD = os.getenv("SHARED_DATA_PASSWORD", "")
-SHARED_DATA_LOCK = threading.Lock()
+SUPABASE_TIMEOUT_SECONDS = 20
 SHARED_VOWELS = {"ㅣ", "ㅔ", "ㅐ", "ㅏ", "ㅓ", "ㅡ", "ㅗ", "ㅜ"}
-SHARED_RECORD_FIELDS = ("id", "speakerId", "region", "country", "nationality", "gender", "age", "vowel", "f1", "f2", "tokenNo", "source")
+SHARED_RECORD_FIELDS = ("id", "speakerId", "region", "country", "nationality", "gender", "age", "vowel", "f1", "f2", "tokenNo", "source", "batchId", "createdAt")
 
 
 def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
@@ -62,48 +59,40 @@ def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
         if not isinstance(raw, dict):
             continue
         record_id = str(raw.get("id", "")).strip()
-        speaker_id = str(raw.get("speakerId", "")).strip()
+        speaker_id = str(raw.get("speakerId", raw.get("speaker_id", ""))).strip()
+        region = str(raw.get("region", "")).strip()
+        gender = str(raw.get("gender", "")).strip()
+        age = str(raw.get("age", "")).strip()
         vowel = str(raw.get("vowel", "")).strip()
         try:
             f1 = float(raw.get("f1"))
             f2 = float(raw.get("f2"))
+            token_no = int(raw.get("tokenNo", raw.get("token_no", 0)))
         except (TypeError, ValueError):
             continue
-        if not record_id or not speaker_id or vowel not in SHARED_VOWELS:
+        if not record_id or not speaker_id or not region or not age or gender not in {"female", "male"} or vowel not in SHARED_VOWELS:
             continue
-        if not np.isfinite(f1) or not np.isfinite(f2) or record_id in seen_ids:
+        if not np.isfinite(f1) or not np.isfinite(f2) or not (0 < f1 < 5000) or not (0 < f2 < 5000) or token_no < 1 or record_id in seen_ids:
             continue
-        item = {key: raw[key] for key in SHARED_RECORD_FIELDS if key in raw}
-        item.update({"id": record_id, "speakerId": speaker_id, "vowel": vowel, "f1": f1, "f2": f2, "source": "manual"})
+        item = {
+            "id": record_id,
+            "speakerId": speaker_id,
+            "region": region,
+            "country": str(raw.get("country", "")).strip(),
+            "nationality": str(raw.get("nationality", "")).strip(),
+            "gender": gender,
+            "age": age,
+            "vowel": vowel,
+            "f1": f1,
+            "f2": f2,
+            "tokenNo": token_no,
+            "source": "manual",
+        }
+        for optional_key in ("batchId", "createdAt"):
+            if raw.get(optional_key):
+                item[optional_key] = raw[optional_key]
         normalized.append(item)
         seen_ids.add(record_id)
-    return normalized
-
-
-def normalize_shared_average_records(records: Any) -> list[dict[str, Any]]:
-    if not isinstance(records, list):
-        return []
-    normalized: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str, str]] = set()
-    for raw in records:
-        if not isinstance(raw, dict):
-            continue
-        age = str(raw.get("age", "")).strip()
-        gender = str(raw.get("gender", "")).strip()
-        vowel = str(raw.get("vowel", "")).strip()
-        try:
-            f1 = float(raw.get("f1"))
-            f2 = float(raw.get("f2"))
-        except (TypeError, ValueError):
-            continue
-        key = (age, gender, vowel)
-        if not age or gender not in {"female", "male"} or vowel not in SHARED_VOWELS or key in seen_keys:
-            continue
-        if not np.isfinite(f1) or not np.isfinite(f2):
-            continue
-        item = {"id": str(raw.get("id") or f"average-{age}-{gender}-{vowel}"), "age": age, "gender": gender, "vowel": vowel, "f1": f1, "f2": f2, "source": "average"}
-        normalized.append(item)
-        seen_keys.add(key)
     return normalized
 
 
@@ -111,83 +100,65 @@ def empty_shared_data() -> dict[str, list[dict[str, Any]]]:
     return {"speakerData": [], "averageData": []}
 
 
-def github_contents_request(method: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
-    encoded_path = urllib.parse.quote(GITHUB_DATA_PATH, safe="/")
-    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/contents/{encoded_path}"
-    if method == "GET":
-        url += "?ref=" + urllib.parse.quote(GITHUB_BRANCH, safe="")
+def supabase_request(method: str, endpoint: str, body: Any | None = None, query: dict[str, str] | None = None) -> Any:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase 연결 정보가 서버에 설정되지 않았습니다.")
+    url = SUPABASE_URL + endpoint
+    if query:
+        url += "?" + urllib.parse.urlencode(query)
     request = urllib.request.Request(url, method=method)
-    request.add_header("Accept", "application/vnd.github+json")
-    request.add_header("X-GitHub-Api-Version", "2022-11-28")
-    if GITHUB_TOKEN:
-        request.add_header("Authorization", f"Bearer {GITHUB_TOKEN}")
+    request.add_header("Accept", "application/json")
+    request.add_header("Content-Type", "application/json")
+    request.add_header("apikey", SUPABASE_SERVICE_KEY)
+    request.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_KEY}")
     if body is not None:
-        request.add_header("Content-Type", "application/json")
-        request.data = json.dumps(body).encode("utf-8")
-    with urllib.request.urlopen(request, timeout=20) as response:
-        response_body = response.read().decode("utf-8")
-    return json.loads(response_body) if response_body else {}
-
-
-def normalize_shared_payload(raw_payload: Any) -> dict[str, list[dict[str, Any]]]:
-    if not isinstance(raw_payload, dict):
-        raw_payload = {}
-    return {
-        "speakerData": normalize_shared_speaker_records(raw_payload.get("speakerData", [])),
-        "averageData": normalize_shared_average_records(raw_payload.get("averageData", [])),
-    }
-
-
-def read_shared_data_with_sha() -> tuple[dict[str, list[dict[str, Any]]], str | None]:
-    if not GITHUB_TOKEN:
-        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPOSITORY}/{urllib.parse.quote(GITHUB_BRANCH, safe='')}/{urllib.parse.quote(GITHUB_DATA_PATH, safe='/')}"
-        raw_request = urllib.request.Request(raw_url)
-        try:
-            with urllib.request.urlopen(raw_request, timeout=20) as response:
-                raw_payload = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            if error.code == 404:
-                return empty_shared_data(), None
-            raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 읽지 못했습니다 (HTTP {error.code}).") from error
-        except (urllib.error.URLError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise HTTPException(status_code=503, detail="GitHub 공유 파일을 읽지 못했습니다.") from error
-        return normalize_shared_payload(raw_payload), None
+        request.data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     try:
-        github_file = github_contents_request("GET")
+        with urllib.request.urlopen(request, timeout=SUPABASE_TIMEOUT_SECONDS) as response:
+            response_body = response.read().decode("utf-8")
+            return json.loads(response_body) if response_body else {}
     except urllib.error.HTTPError as error:
-        if error.code == 404:
-            return empty_shared_data(), None
-        raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 읽지 못했습니다 (HTTP {error.code}).") from error
-    encoded_content = str(github_file.get("content", "")).replace("\n", "")
-    try:
-        decoded_content = base64.b64decode(encoded_content).decode("utf-8")
-        raw_payload = json.loads(decoded_content)
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-        raw_payload = {}
-    return normalize_shared_payload(raw_payload), str(github_file.get("sha")) if github_file.get("sha") else None
+        error_body = error.read().decode("utf-8", errors="replace")
+        if error.code == 409:
+            raise HTTPException(status_code=409, detail="공유 데이터가 동시에 변경되었습니다. 잠시 후 다시 시도해 주세요.") from error
+        if 400 <= error.code < 500:
+            raise HTTPException(status_code=422, detail="공유 데이터 요청을 Supabase가 거부했습니다.") from error
+        raise HTTPException(status_code=503, detail="Supabase 공유 데이터 저장소에 연결하지 못했습니다.") from error
+    except (urllib.error.URLError, TimeoutError) as error:
+        raise HTTPException(status_code=503, detail="Supabase 공유 데이터 저장소에 연결하지 못했습니다.") from error
+
+
+def shared_row_to_record(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id", "")),
+        "speakerId": str(row.get("speaker_id", "")),
+        "region": str(row.get("region", "")),
+        "country": str(row.get("country") or ""),
+        "nationality": str(row.get("nationality") or ""),
+        "gender": str(row.get("gender", "")),
+        "age": str(row.get("age", "")),
+        "vowel": str(row.get("vowel", "")),
+        "f1": row.get("f1"),
+        "f2": row.get("f2"),
+        "tokenNo": row.get("token_no"),
+        "source": str(row.get("source") or "manual"),
+        "batchId": row.get("batch_id"),
+        "createdAt": row.get("created_at"),
+    }
 
 
 def read_shared_data() -> dict[str, list[dict[str, Any]]]:
-    return read_shared_data_with_sha()[0]
-
-
-def write_shared_data(payload: dict[str, list[dict[str, Any]]], sha: str | None) -> None:
-    if not GITHUB_TOKEN:
-        raise HTTPException(status_code=503, detail="GitHub 쓰기 토큰이 Render에 설정되지 않았습니다.")
-    content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-    request_body: dict[str, Any] = {
-        "message": "Update shared vowel data",
-        "content": base64.b64encode(content).decode("ascii"),
-        "branch": GITHUB_BRANCH,
-    }
-    if sha:
-        request_body["sha"] = sha
-    try:
-        github_contents_request("PUT", request_body)
-    except urllib.error.HTTPError as error:
-        if error.code == 409:
-            raise HTTPException(status_code=409, detail="GitHub 공유 파일이 동시에 변경되었습니다. 다시 시도해 주세요.") from error
-        raise HTTPException(status_code=503, detail=f"GitHub 공유 파일을 저장하지 못했습니다 (HTTP {error.code}).") from error
+    rows = supabase_request(
+        "GET",
+        "/rest/v1/vowel_tokens",
+        query={
+            "select": "id,speaker_id,region,country,nationality,gender,age,vowel,f1,f2,token_no,source,batch_id,created_at",
+            "deleted_at": "is.null",
+            "order": "created_at.asc,id.asc",
+        },
+    )
+    records = [shared_row_to_record(row) for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    return {"speakerData": normalize_shared_speaker_records(records), "averageData": []}
 
 
 def require_shared_write_password(candidate: str | None) -> None:
@@ -199,52 +170,67 @@ def require_shared_write_password(candidate: str | None) -> None:
 
 @app.get("/shared-data")
 def get_shared_data() -> dict[str, Any]:
-    with SHARED_DATA_LOCK:
-        payload = read_shared_data()
-    return {"ok": True, **payload}
+    return {"ok": True, **read_shared_data()}
 
 
 @app.post("/shared-data")
 def append_shared_data(payload: dict[str, Any], x_shared_data_password: str | None = Header(default=None)) -> dict[str, Any]:
     require_shared_write_password(x_shared_data_password)
     speaker_records = normalize_shared_speaker_records(payload.get("speakerData", []))
-    average_records = normalize_shared_average_records(payload.get("averageData", []))
-    if not speaker_records and not average_records:
-        raise HTTPException(status_code=422, detail="공유할 유효한 모음값이 없습니다.")
-    with SHARED_DATA_LOCK:
-        current, sha = read_shared_data_with_sha()
-        speaker_by_id = {item["id"]: item for item in current["speakerData"]}
-        for item in speaker_records:
-            speaker_by_id.setdefault(item["id"], item)
-        average_by_key = {(item["age"], item["gender"], item["vowel"]): item for item in current["averageData"]}
-        for item in average_records:
-            average_by_key.setdefault((item["age"], item["gender"], item["vowel"]), item)
-        merged = {"speakerData": list(speaker_by_id.values()), "averageData": list(average_by_key.values())}
-        write_shared_data(merged, sha)
-    return {"ok": True, **merged}
+    if not speaker_records:
+        raise HTTPException(status_code=422, detail="공유할 새 화자 토큰이 없습니다.")
+    batch_id = str(payload.get("batchId") or f"batch-{uuid.uuid4().hex}").strip()
+    client_request_id = str(payload.get("clientRequestId") or batch_id).strip()
+    rpc_payload = {
+        "p_batch_id": batch_id,
+        "p_client_request_id": client_request_id,
+        "p_records": [
+            {
+                "id": item["id"],
+                "speaker_id": item["speakerId"],
+                "region": item["region"],
+                "country": item.get("country", ""),
+                "nationality": item.get("nationality", ""),
+                "gender": item["gender"],
+                "age": item["age"],
+                "vowel": item["vowel"],
+                "f1": item["f1"],
+                "f2": item["f2"],
+                "token_no": item["tokenNo"],
+                "source": "manual",
+            }
+            for item in speaker_records
+        ],
+    }
+    result = supabase_request("POST", "/rest/v1/rpc/append_vowel_batch", rpc_payload)
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        raise HTTPException(status_code=503, detail="Supabase에 일괄 입력을 저장하지 못했습니다.")
+    return {
+        "ok": True,
+        "batchId": result.get("batchId", batch_id),
+        "insertedCount": int(result.get("insertedCount", len(speaker_records)) or 0),
+        "speakerData": normalize_shared_speaker_records(result.get("speakerData", [])),
+        "averageData": [],
+    }
 
 
 @app.delete("/shared-data")
 def delete_shared_data(payload: dict[str, Any], x_shared_data_password: str | None = Header(default=None)) -> dict[str, Any]:
     require_shared_write_password(x_shared_data_password)
-    with SHARED_DATA_LOCK:
-        current, sha = read_shared_data_with_sha()
-        if payload.get("all") is True:
-            merged = empty_shared_data()
-        else:
-            speaker_ids = {str(item) for item in payload.get("speakerIds", []) if item}
-            average_keys = {
-                (str(item.get("age", "")), str(item.get("gender", "")), str(item.get("vowel", "")))
-                for item in payload.get("averageKeys", [])
-                if isinstance(item, dict)
-            }
-            merged = {
-                "speakerData": [item for item in current["speakerData"] if item["id"] not in speaker_ids],
-                "averageData": [item for item in current["averageData"] if (item["age"], item["gender"], item["vowel"]) not in average_keys],
-            }
-        write_shared_data(merged, sha)
-    return {"ok": True, **merged}
-
+    speaker_ids = [str(item) for item in payload.get("speakerIds", []) if item] if isinstance(payload.get("speakerIds", []), list) else []
+    result = supabase_request(
+        "POST",
+        "/rest/v1/rpc/delete_vowel_tokens",
+        {"p_ids": speaker_ids, "p_all": payload.get("all") is True},
+    )
+    if not isinstance(result, dict) or result.get("ok") is not True:
+        raise HTTPException(status_code=503, detail="Supabase에서 공유 데이터를 삭제하지 못했습니다.")
+    return {
+        "ok": True,
+        "deletedCount": int(result.get("deletedCount", 0) or 0),
+        "speakerData": normalize_shared_speaker_records(result.get("speakerData", [])),
+        "averageData": [],
+    }
 
 def convert_to_wav(input_path: Path, output_path: Path) -> None:
     ffmpeg = shutil.which("ffmpeg")
