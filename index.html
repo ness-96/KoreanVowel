@@ -390,7 +390,7 @@
           <button class="panel-head panel-toggle" type="button" id="pointFormToggle" aria-expanded="false" aria-controls="pointFormBody">
             <span class="panel-toggle-label">
               <span class="panel-title">모음 값 일괄 추가</span>
-              <span class="panel-caption">새 모음값 입력</span>
+              <span class="panel-caption" id="pointFormCaption">새 모음값 입력</span>
             </span>
             <span class="panel-toggle-icon" id="pointFormToggleIcon" aria-hidden="true">＋</span>
           </button>
@@ -416,6 +416,7 @@
                 <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
                 <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
                 <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
+                <div class="field full" id="averageReferenceField" hidden><label for="averageReference">평균값 참고 논문·자료</label><input id="averageReference" maxlength="180" placeholder="예: Yang (1992), JASA, Table 1, hVda" /></div>
               </div>
               <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
               <div class="batch-input-grid" id="batchInputGrid"></div>
@@ -463,7 +464,7 @@
       <div class="filter-dialog-head">
         <div>
           <div class="panel-title" id="filterModalTitle">분포 필터</div>
-          <div class="panel-caption">성별·연령대·화자 모양을 선택합니다.</div>
+          <div class="panel-caption">성별·연령대·평균 출처·화자 모양을 선택합니다.</div>
         </div>
         <button class="filter-dialog-close" type="button" id="filterCloseBtn" aria-label="분포 필터 닫기">×</button>
       </div>
@@ -486,6 +487,10 @@
           <button class="age-button" data-age="60대">60대</button>
           <button class="age-button" data-age="70대">70대</button>
         </div>
+        <span class="section-label">평균값 출처</span>
+        <select class="speaker-select" id="averageSeriesSelect">
+          <option value="all">모든 평균 출처</option>
+        </select>
         <span class="section-label">화자 모음 모양</span>
         <select class="speaker-select" id="speakerShapeSelect">
           <option value="all">화자 선택</option>
@@ -607,20 +612,38 @@
       return data.filter(item => item.speakerId === speakerId && item.vowel === vowel).reduce((max, item) => Math.max(max, Number(item.tokenNo) || 0), 0) + 1;
     }
     function normalizeAverageData(records) {
-      const unique = new Map();
-      records.forEach(item => {
-        if (!item || !item.age || !item.gender || !item.vowel) return;
-        const key = `${item.age}::${item.gender}::${item.vowel}`;
-        if (!unique.has(key)) unique.set(key, { ...item, source: 'average', id: item.id || `average-${item.age}-${item.gender}-${item.vowel}` });
+      const usedIds = new Set();
+      const legacySeriesIds = new Map();
+      return (Array.isArray(records) ? records : []).flatMap((item, index) => {
+        if (!item || !item.age || !item.gender || !item.vowel) return [];
+        const age = item.age === 'average' ? '평균' : item.age;
+        const reference = String(item.averageReference || item.reference || item.sourceLabel || '').trim() || '기존 평균값';
+        const legacyKey = age + '::' + item.gender;
+        const seriesId = String(item.averageSeriesId || item.seriesId || legacySeriesIds.get(legacyKey) || ('average-series-' + age + '-' + item.gender + '-legacy'));
+        legacySeriesIds.set(legacyKey, seriesId);
+        const baseId = String(item.id || (seriesId + '-' + item.vowel + '-' + index));
+        let id = baseId;
+        let suffix = 2;
+        while (usedIds.has(id)) id = baseId + '-' + suffix++;
+        usedIds.add(id);
+        return [{
+          ...item,
+          id,
+          age,
+          gender: item.gender,
+          vowel: item.vowel,
+          averageReference: reference,
+          averageSeriesId: seriesId,
+          source: 'average'
+        }];
       });
-      return [...unique.values()];
     }
     function loadAverageData() {
       try {
         const saved = JSON.parse(localStorage.getItem(AVERAGE_STORAGE_KEY));
         if (Array.isArray(saved)) {
           const normalized = normalizeAverageData(saved);
-          if (normalized.length !== saved.length) localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(normalized));
+          if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(normalized));
           return normalized;
         }
       } catch (e) {}
@@ -750,7 +773,13 @@
       const explicitKeys = new Set(explicit.map(averageEntryKey));
       const legacy = data
         .filter(isLegacyAverageSpeaker)
-        .map(d => ({ ...d, age: '평균', source: 'average' }))
+        .map(d => ({
+          ...d,
+          age: '평균',
+          source: 'average',
+          averageReference: d.averageReference || d.reference || '기존 평균값',
+          averageSeriesId: d.averageSeriesId || ('legacy-speaker-average-' + d.gender)
+        }))
         .filter(d => !explicitKeys.has(averageEntryKey(d)));
       return [...explicit, ...legacy];
     }
@@ -763,28 +792,38 @@
       return data.filter(d => !isLegacyAverageSpeaker(d) && (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function filteredAverageData() {
-      return averageDisplayData().filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
+      return averageDisplayData().filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d) && (selectedAverageSeries === 'all' || averageSeriesKey(d) === selectedAverageSeries));
     }
     function refreshDataSelectors() {
       const allSpeakers = [...new Set(data.map(d => d.speakerId))].sort();
       const visibleSpeakers = [...new Set(filteredData().map(d => d.speakerId))].sort();
       if (selectedSpeaker !== 'all' && !visibleSpeakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
       const shapeSelect = document.getElementById('speakerShapeSelect');
-      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + visibleSpeakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + visibleSpeakers.map(id => '<option value="' + esc(id) + '">' + esc(id) + '</option>').join('');
       shapeSelect.value = selectedSpeaker;
       const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
-      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
+      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => '<option value="' + esc(id) + '">' + esc(id) + ' (' + data.filter(d => d.speakerId === id).length + '개)</option>').join('');
       const deleteValue = document.getElementById('deleteValueSelect');
-      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · ${d.tokenNo || 1}회 · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(locationLabel(d))}</option>`).join('');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => '<option value="' + esc(d.id) + '">' + esc(d.speakerId) + ' · ' + esc(d.vowel) + ' · ' + (d.tokenNo || 1) + '회 · F1 ' + d.f1 + ' / F2 ' + d.f2 + ' · ' + esc(d.nationality || '미입력') + ' · ' + esc(locationLabel(d)) + '</option>').join('');
       const deleteAverage = document.getElementById('deleteAverageSelect');
-      deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => `<option value="${esc(d.id)}">${esc(d.age)} · ${d.gender === 'female' ? '여성' : '남성'} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2}</option>`).join('');
+      deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => '<option value="' + esc(d.id) + '">' + esc(d.age) + ' · ' + (d.gender === 'female' ? '여성' : '남성') + ' · ' + esc(d.vowel) + ' · ' + esc(d.averageReference || '기존 평균값') + ' · F1 ' + d.f1 + ' / F2 ' + d.f2 + '</option>').join('');
+      const averageSeriesSelect = document.getElementById('averageSeriesSelect');
+      if (averageSeriesSelect) {
+        const seriesExamples = new Map();
+        averageDisplayData().forEach(d => { const key = averageSeriesKey(d); if (!seriesExamples.has(key)) seriesExamples.set(key, d); });
+        if (selectedAverageSeries !== 'all' && !seriesExamples.has(selectedAverageSeries)) selectedAverageSeries = 'all';
+        averageSeriesSelect.innerHTML = '<option value="all">모든 평균 출처</option>' + [...seriesExamples.entries()].map(([key, d]) => '<option value="' + esc(key) + '">' + esc(averageSeriesLabel(d)) + '</option>').join('');
+        averageSeriesSelect.value = selectedAverageSeries;
+      }
     }
     function averageSeriesKey(d) {
-      return `${d.age}|${d.gender}`;
+      return String(d.averageSeriesId || ('average-series-' + (d.age || '평균') + '-' + (d.gender || 'unknown') + '-' + (d.averageReference || '기존 평균값')));
     }
     function averageSeriesLabel(d) {
       const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
-      return d.age === '평균' ? `${genderLabel} 평균` : `${d.age} ${genderLabel} 평균`;
+      const ageLabel = d.age === '평균' ? '' : d.age + ' ';
+      const reference = d.averageReference || '기존 평균값';
+      return ageLabel + genderLabel + ' 평균 · ' + reference;
     }
     function collapseVowelTokens(items) {
       const groups = new Map();
@@ -829,7 +868,7 @@
           .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel)))
           .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
         shapeLabel = selectedSpeaker;
-      } else if ((selectedAge === '평균' || selectedAge === 'average') && selectedGender === 'all') {
+      } else if (selectedAge === '평균' || selectedAge === 'average') {
         const grouped = new Map();
         filteredAverageData()
           .filter(d => VOWEL_TRIANGLE_ORDER.includes(d.vowel))
@@ -900,14 +939,21 @@
       const regionField = document.getElementById('regionField');
       const countryField = document.getElementById('overseasCountryField');
       const nationalityField = document.getElementById('nationalityField');
+      const averageReferenceField = document.getElementById('averageReferenceField');
       const speakerId = document.getElementById('speakerId');
       const region = document.getElementById('region');
       const country = document.getElementById('overseasCountry');
       const nationality = document.getElementById('nationality');
+      const averageReference = document.getElementById('averageReference');
       const caption = document.getElementById('pointFormCaption');
       const note = document.getElementById('inputRuleNote');
       [speakerIdField, regionField, countryField, nationalityField].forEach(field => { if (field) field.hidden = isAverage; });
+      if (averageReferenceField) averageReferenceField.hidden = !isAverage;
       [speakerId, region, country, nationality].forEach(field => { if (field) field.disabled = isAverage; });
+      if (averageReference) {
+        averageReference.disabled = !isAverage;
+        averageReference.required = isAverage;
+      }
       speakerId.required = !isAverage;
       region.required = !isAverage;
       country.required = !isAverage && region.value === '해외';
@@ -916,11 +962,11 @@
         region.value = '';
         country.value = '';
         nationality.value = '대한민국';
-        caption.textContent = '성별 평균의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 평균값으로 추가됩니다.';
-        note.textContent = '평균을 선택하면 화자 ID·지역 없이 성별 평균값으로 저장됩니다. 같은 성별·모음 평균은 중복 입력할 수 없습니다.';
+        if (caption) caption.textContent = '성별 평균의 8개 모음과 참고 논문·자료를 한 번에 입력합니다. 비워 둔 모음은 건너뜁니다.';
+        if (note) note.textContent = '같은 연령대·성별이라도 참고 논문·자료가 다르면 여러 평균 결과를 각각 추가할 수 있습니다.';
       } else {
-        caption.textContent = '한 화자의 모음값을 입력합니다. 비워 둔 모음은 건너뛰며, 같은 모음의 반복 입력은 별도 토큰으로 저장됩니다.';
-        note.textContent = '같은 화자 ID의 같은 모음도 반복 입력할 수 있습니다. 입력할 때마다 별도의 반복 토큰으로 저장됩니다.';
+        if (caption) caption.textContent = '한 화자의 모음값을 입력합니다. 비워 둔 모음은 건너뛰며, 같은 모음의 반복 입력은 별도 토큰으로 저장됩니다.';
+        if (note) note.textContent = '같은 화자 ID의 같은 모음도 반복 입력할 수 있습니다. 입력할 때마다 별도의 반복 토큰으로 저장됩니다.';
         updateRegionField();
       }
     }
@@ -930,8 +976,8 @@
         <div class="batch-input-card">
           <div class="batch-vowel-head"><strong>${vowel}</strong><span>${VOWEL_SYLLABLES[vowel]}</span></div>
           <div class="batch-formant-grid">
-            <label class="batch-formant-label">F1<input class="batch-formant-input" id="${batchFieldId('f1', vowel)}" type="number" min="100" max="1500" step="0.1" placeholder="430" /></label>
-            <label class="batch-formant-label">F2<input class="batch-formant-input" id="${batchFieldId('f2', vowel)}" type="number" min="400" max="3500" step="0.1" placeholder="1900" /></label>
+            <label class="batch-formant-label">F1<input class="batch-formant-input" id="${batchFieldId('f1', vowel)}" type="number" min="100" max="1500" step="any" placeholder="430" /></label>
+            <label class="batch-formant-label">F2<input class="batch-formant-input" id="${batchFieldId('f2', vowel)}" type="number" min="400" max="3500" step="any" placeholder="1900" /></label>
           </div>
         </div>`).join('');
     }
@@ -970,9 +1016,11 @@
           selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
           selectedSpeaker = d.source === 'average' ? 'all' : d.speakerId || 'all';
           selectedGender = 'all';
-          selectedAge = 'all';
+          selectedAge = d.source === 'average' ? (d.age === '평균' ? '평균' : d.age) : 'all';
           document.querySelectorAll('#genderFilter button').forEach(button => button.classList.toggle('active', button.dataset.gender === selectedGender));
           document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === selectedAge));
+          const averageSeriesSelect = document.getElementById('averageSeriesSelect');
+          if (averageSeriesSelect) averageSeriesSelect.value = selectedAverageSeries;
           render();
         });
       });
@@ -989,17 +1037,20 @@
       if (!d) return;
       const isMic = d.source === 'microphone';
       const isAverage = d.source === 'average';
-      const genderLabel = d.gender === 'female' ? '여성' : '남성';
-      const title = isAverage ? `${d.age === '평균' ? '' : d.age + ' '}${genderLabel} 평균 · ${d.vowel}` : `${d.vowel} · ${d.speakerId} · ${d.tokenNo || 1}회`;
+      const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
+      const reference = d.averageReference || d.reference || '기존 평균값';
+      const title = isAverage
+        ? (d.age === '평균' ? '' : d.age + ' ') + genderLabel + ' 평균 · ' + d.vowel + ' · ' + reference
+        : d.vowel + ' · ' + d.speakerId + ' · ' + (d.tokenNo || 1) + '회';
       const locationDetails = d.region === '해외'
-        ? `<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>${esc(d.country || '미입력')}</b></div>`
-        : `<div class="tooltip-row"><span>지역</span><b>${esc(locationLabel(d))}</b></div>`;
+        ? '<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>' + esc(d.country || '미입력') + '</b></div>'
+        : '<div class="tooltip-row"><span>지역</span><b>' + esc(locationLabel(d)) + '</b></div>';
       const details = isMic
-        ? `<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
+        ? '<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>' + esc(d.vowel) + '</b></div>'
         : isAverage
-          ? `<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div>`
-          : `<div class="tooltip-row"><span>반복 토큰</span><b>${d.tokenNo || 1}회</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div>${locationDetails}`;
-      tooltip.innerHTML = `<div class="tooltip-title">${esc(title)}</div>${details}<div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
+          ? '<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>참고 논문·자료</span><b>' + esc(reference) + '</b></div>'
+          : '<div class="tooltip-row"><span>반복 토큰</span><b>' + (d.tokenNo || 1) + '회</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>국적</span><b>' + esc(d.nationality || '미입력') + '</b></div>' + locationDetails;
+      tooltip.innerHTML = '<div class="tooltip-title">' + esc(title) + '</div>' + details + '<div class="tooltip-row"><span>F1 / F2</span><b>' + d.f1 + ' / ' + d.f2 + ' Hz</b></div>';
       tooltip.classList.remove('hidden'); moveTooltip(e);
     }
     function moveTooltip(e) {
@@ -1552,6 +1603,18 @@
       render();
     });
 
+    document.getElementById('averageSeriesSelect').addEventListener('change', e => {
+      selectedAverageSeries = e.target.value;
+      selectedSpeaker = 'all';
+      selectedVowel = 'all';
+      if (selectedAverageSeries !== 'all') {
+        selectedAge = '평균';
+        document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === '평균'));
+      }
+      updateFilterSummary();
+      render();
+    });
+
     function sharedDataEndpoint() {
       return SHARED_DATA_API_URL.replace(/\/$/, '') + '/shared-data';
     }
@@ -1723,9 +1786,15 @@
       const region = document.getElementById('region').value;
       const country = region === '해외' ? document.getElementById('overseasCountry').value.trim() : '';
       const gender = document.getElementById('gender').value;
+      const averageReference = document.getElementById('averageReference').value.trim();
       const formMessage = document.getElementById('formMessage');
       formMessage.textContent = '';
       formMessage.className = 'form-message';
+      if (isAverage && !averageReference) {
+        formMessage.textContent = '평균값을 추가할 때 참고 논문·자료를 입력해 주세요.';
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
       if (!isAverage && (!speakerId || !region || (region === '해외' && !country))) {
         formMessage.textContent = region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '화자 ID와 지역을 먼저 입력해 주세요.';
         formMessage.classList.add('visible', 'error');
@@ -1761,37 +1830,30 @@
       }
       const genderLabel = gender === 'female' ? '여성' : '남성';
       const now = Date.now();
-      const duplicateVowels = [];
       if (isAverage) {
-        const newItems = entries.flatMap(({ vowel, f1, f2 }) => {
-          if (averageData.some(d => d.age === '평균' && d.gender === gender && d.vowel === vowel)) {
-            duplicateVowels.push(vowel);
-            return [];
-          }
-          return [{
-            id: 'average-평균-' + gender + '-' + vowel,
-            age: '평균',
-            gender,
-            vowel,
-            f1,
-            f2,
-            source: 'average'
-          }];
-        });
-        if (!newItems.length) {
-          formMessage.textContent = genderLabel + ' 평균의 ' + duplicateVowels.join(', ') + ' 값은 이미 있습니다. 기존 값을 유지했으며, 중복 평균값은 추가하지 않았습니다.';
-          formMessage.classList.add('visible', 'error');
-          return;
-        }
+        const seriesId = 'average-series-' + now + '-' + Math.random().toString(36).slice(2, 9);
+        const newItems = entries.map(({ vowel, f1, f2 }) => ({
+          id: seriesId + '-' + vowel,
+          age: '평균',
+          gender,
+          vowel,
+          f1,
+          f2,
+          averageReference,
+          averageSeriesId: seriesId,
+          source: 'average'
+        }));
         averageData.push(...newItems);
         saveAverageData();
+        selectedAverageSeries = seriesId;
+        selectedAge = '평균';
+        document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === '평균'));
         e.target.reset();
         document.getElementById('gender').value = 'female';
         document.getElementById('age').value = '20대';
         updateRegionField();
         updateInputMode();
-        const duplicateNotice = duplicateVowels.length ? ' 이미 있던 ' + duplicateVowels.join(', ') + ' 값은 기존 평균값을 유지했습니다.' : '';
-        formMessage.textContent = '평균 ' + genderLabel + '의 ' + newItems.length + '개 모음값이 추가되었습니다.' + duplicateNotice;
+        formMessage.textContent = '평균 ' + genderLabel + ' · ' + averageReference + '의 ' + newItems.length + '개 모음값이 추가되었습니다. 기존 평균값과 별도 결과로 저장했습니다.';
         formMessage.classList.add('visible', 'success');
         render();
         return;
@@ -1888,7 +1950,7 @@
       if (!id) return;
       const item = averageData.find(d => d.id === id);
       if (!item) return;
-      openDeleteConfirm(`${item.age} ${item.gender === 'female' ? '여성' : '남성'}의 ${item.vowel} 평균값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, async () => {
+      openDeleteConfirm(`${item.age} ${item.gender === 'female' ? '여성' : '남성'} · ${item.averageReference || '기존 평균값'}의 ${item.vowel} 평균값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, async () => {
         averageData = averageData.filter(d => d.id !== id);
         saveAverageData();
         render();
