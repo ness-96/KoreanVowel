@@ -51,6 +51,7 @@ SHARED_RECORD_FIELDS = ("id", "speakerId", "region", "country", "nationality", "
 
 
 
+def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
     if not isinstance(records, list):
         return []
     normalized: list[dict[str, Any]] = []
