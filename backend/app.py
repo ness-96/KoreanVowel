@@ -70,7 +70,7 @@ def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
             token_no = int(raw.get("tokenNo", raw.get("token_no", 0)))
         except (TypeError, ValueError):
             continue
-        if not record_id or not speaker_id or not region or not age or gender not in {"female", "male"} or vowel not in SHARED_VOWELS:
+        if not record_id or not speaker_id or not age or gender not in {"female", "male"} or vowel not in SHARED_VOWELS:
             continue
         if not np.isfinite(f1) or not np.isfinite(f2) or not (0 < f1 < 5000) or not (0 < f2 < 5000) or token_no < 1 or record_id in seen_ids:
             continue
