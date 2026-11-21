@@ -50,7 +50,7 @@ SHARED_VOWELS = {"ㅣ", "ㅔ", "ㅐ", "ㅏ", "ㅓ", "ㅡ", "ㅗ", "ㅜ"}
 SHARED_RECORD_FIELDS = ("id", "speakerId", "region", "country", "nationality", "gender", "age", "vowel", "f1", "f2", "tokenNo", "source", "batchId", "createdAt")
 
 
-def normalize_shared_speaker_records(records: Any) -> list[dict[str, Any]]:
+(records: Any) -> list[dict[str, Any]]:
     if not isinstance(records, list):
         return []
     normalized: list[dict[str, Any]] = []
