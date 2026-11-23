@@ -522,6 +522,25 @@
     const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     const AVERAGE_STORAGE_KEY = 'vowel-space-prototype-v2-averages';
+    const DEFAULT_AVERAGE_SERIES = [
+      { id: 'default-yang-1992-male', reference: 'Yang(1992)', gender: 'male', values: [[341, 2219], [490, 1968], [591, 1849], [738, 1372], [608, 1121], [405, 1488], [453, 945], [369, 981]] },
+      { id: 'default-yang-1992-female', reference: 'Yang(1992)', gender: 'female', values: [[344, 2814], [650, 2377], [677, 2285], [986, 1794], [765, 1371], [447, 1703], [499, 1029], [422, 1021]] },
+      { id: 'default-yoon-kang-2014-male', reference: '윤태진·강윤정(2014)', gender: 'male', values: [[325, 1960], [448, 1739], [444, 1717], [638, 1333], [486, 1100], [374, 1381], [412, 984], [333, 1066]] },
+      { id: 'default-yoon-kang-2014-female', reference: '윤태진·강윤정(2014)', gender: 'female', values: [[360, 2442], [500, 2168], [480, 2173], [825, 1688], [595, 1286], [410, 1706], [450, 1103], [357, 1203]] }
+    ];
+    function buildDefaultAverageData() {
+      return DEFAULT_AVERAGE_SERIES.flatMap(series => VOWELS.map((vowel, index) => ({
+        id: series.id + '-' + vowel,
+        age: '평균',
+        gender: series.gender,
+        vowel,
+        f1: series.values[index][0],
+        f2: series.values[index][1],
+        averageReference: series.reference,
+        averageSeriesId: series.id,
+        source: 'average'
+      })));
+    }
     let data = loadData();
     let averageData = loadAverageData();
     let selectedGender = 'all';
@@ -624,6 +643,11 @@
       });
     }
     function loadAverageData() {
+      if (!localStorage.getItem(AVERAGE_STORAGE_KEY)) {
+        const defaults = normalizeAverageData(buildDefaultAverageData());
+        try { localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(defaults)); } catch (e) {}
+        return defaults;
+      }
       try {
         const saved = JSON.parse(localStorage.getItem(AVERAGE_STORAGE_KEY));
         if (Array.isArray(saved)) {
