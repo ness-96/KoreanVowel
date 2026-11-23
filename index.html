@@ -386,7 +386,7 @@
           </div>
           <div class="vowel-data-table-wrap">
             <table class="vowel-data-table">
-              <thead><tr><th>자료</th><th>연령대</th><th>성별</th><th>1회</th><th>2회</th><th>3회</th></tr></thead>
+              <thead id="vowelDataHead"><tr><th>자료</th><th>연령대</th><th>성별</th><th>1회</th><th>2회</th><th>3회</th></tr></thead>
               <tbody id="vowelDataBody"></tbody>
             </table>
           </div>
@@ -968,9 +968,10 @@
     function renderVowelDataPanel() {
       const panel = document.getElementById('vowelDataPanel');
       const body = document.getElementById('vowelDataBody');
+      const head = document.getElementById('vowelDataHead');
       const title = document.getElementById('vowelDataTitle');
       const note = document.getElementById('vowelDataNote');
-      if (!panel || !body) return;
+      if (!panel || !body || !head) return;
       const active = selectedView === 'vowel' && selectedVowel !== 'all';
       panel.classList.toggle('hidden', !active);
       if (!active) return;
@@ -1007,6 +1008,7 @@
             return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td><td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
           }).join('')
         : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition) + '">현재 필터에 해당하는 ' + esc(selectedVowel) + ' 값이 없습니다.</td></tr>';
+      head.innerHTML = header;
       body.innerHTML = bodyMarkup;
       if (note) note.textContent = rows.length + '개 자료. 같은 화자의 반복 토큰은 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
     }
