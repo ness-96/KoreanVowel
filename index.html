@@ -181,6 +181,33 @@
     .age-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .age-button.active { color: var(--navy); background: #eaf1ff; border-color: #a9c1f5; }
     .filter-summary { margin-top: 14px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #65748a; font-size: 11px; line-height: 1.5; }
+    .view-mode-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+    .view-mode-button, .vowel-filter-button { min-height: 32px; padding: 7px 6px; border: 1px solid #d9e2ef; border-radius: 8px; background: #fff; color: #607089; font-size: 11px; font-weight: 700; }
+    .view-mode-button.active, .vowel-filter-button.active { border-color: #7ea3ee; background: #eef4ff; color: #294a89; }
+    .vowel-filter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; }
+    .vowel-data-panel { margin: 14px 26px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcff; }
+    .vowel-data-panel.hidden { display: none; }
+    .vowel-data-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+    .vowel-data-note { margin-top: 4px; color: #718096; font-size: 11px; line-height: 1.45; }
+    .vowel-data-table-wrap { overflow-x: auto; }
+    .vowel-data-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 11px; }
+    .vowel-data-table th, .vowel-data-table td { padding: 9px 8px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: middle; white-space: nowrap; }
+    .vowel-data-table th { color: #607089; background: #f4f7fb; font-weight: 800; }
+    .vowel-data-table td { color: #27364c; }
+    .vowel-data-table .formant-pair { line-height: 1.35; }
+    .vowel-data-table .formant-pair strong { color: #294a89; font-weight: 800; }
+    .vowel-data-table .average-row td { background: #fffdf6; }
+    .vowel-data-empty { padding: 18px 8px !important; color: #718096 !important; text-align: center !important; }
+    .repeat-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .repeat-legend.hidden { display: none; }
+    .repeat-legend-item { display: inline-flex; align-items: center; gap: 5px; color: #607089; font-size: 10px; font-weight: 700; }
+    .repeat-line { display: inline-block; width: 18px; height: 0; border-top: 3px solid #294a89; }
+    .repeat-line.repeat-2 { border-top-color: #d66a32; border-top-style: dashed; }
+    .repeat-line.repeat-3 { border-top-color: #2f9d68; border-top-style: dotted; }
+    .speaker-path.repetition-1 { stroke: #294a89; }
+    .speaker-path.repetition-2 { stroke: #d66a32; stroke-dasharray: 8 5; }
+    .speaker-path.repetition-3 { stroke: #2f9d68; stroke-dasharray: 2 5; }
+    @media (max-width: 760px) { .vowel-data-panel { margin: 14px 10px 0; } .vowel-data-head { display: block; } .repeat-legend { margin-top: 10px; } }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
     .field.full { grid-column: 1 / -1; }
     .batch-input-heading { display: flex; align-items: baseline; justify-content: space-between; margin-top: 15px; color: #708097; font-size: 11px; font-weight: 800; }
@@ -315,7 +342,7 @@
         <div class="filter-launch">
           <button class="filter-launch-button" type="button" id="filterToggle" aria-haspopup="dialog" aria-controls="filterModal">
             <span class="filter-launch-title">분포 필터</span>
-            <span class="filter-launch-summary" id="filterSummaryText">전체 · 전체 · 모음 전체</span>
+            <span class="filter-launch-summary" id="filterSummaryText">전체 분포 · 성별 전체 · 연령 전체</span>
             <span class="filter-launch-icon" aria-hidden="true">⌄</span>
           </button>
         </div>
@@ -343,7 +370,26 @@
           <span class="legend-item"><span class="legend-dot green"></span>내 발음(Praat 서버)</span>
           <span class="legend-item"><span class="legend-dot average"></span>연령대·성별 평균</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
+          <span class="repeat-legend hidden" id="repetitionLegend">
+            <span class="repeat-legend-item"><span class="repeat-line"></span>1회</span>
+            <span class="repeat-legend-item"><span class="repeat-line repeat-2"></span>2회</span>
+            <span class="repeat-legend-item"><span class="repeat-line repeat-3"></span>3회</span>
+          </span>
         </div>
+        <section class="vowel-data-panel hidden" id="vowelDataPanel" aria-live="polite">
+          <div class="vowel-data-head">
+            <div>
+              <div class="panel-title" id="vowelDataTitle">특정 모음값</div>
+              <div class="vowel-data-note" id="vowelDataNote"></div>
+            </div>
+          </div>
+          <div class="vowel-data-table-wrap">
+            <table class="vowel-data-table">
+              <thead><tr><th>자료</th><th>연령대</th><th>성별</th><th>1회</th><th>2회</th><th>3회</th></tr></thead>
+              <tbody id="vowelDataBody"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <aside class="sidebar">
@@ -454,6 +500,12 @@
         <button class="filter-dialog-close" type="button" id="filterCloseBtn" aria-label="분포 필터 닫기">×</button>
       </div>
       <div class="filter-dialog-body">
+        <span class="section-label">보기 방식</span>
+        <div class="view-mode-group" id="viewModeFilter">
+          <button class="view-mode-button active" data-view="overview">전체 분포</button>
+          <button class="view-mode-button" data-view="speaker">화자 삼각도</button>
+          <button class="view-mode-button" data-view="vowel">특정 모음값</button>
+        </div>
         <span class="section-label">성별</span>
         <div class="segmented" id="genderFilter">
           <button class="active" data-gender="all">전체</button>
@@ -472,15 +524,27 @@
           <button class="age-button" data-age="60대">60대</button>
           <button class="age-button" data-age="70대">70대</button>
         </div>
-        <span class="section-label">평균값 출처</span>
+        <span class="section-label" id="averageSeriesLabel">평균값 출처</span>
         <select class="speaker-select" id="averageSeriesSelect">
           <option value="all">모든 평균 출처</option>
         </select>
-        <span class="section-label">화자 모음 모양</span>
-        <select class="speaker-select" id="speakerShapeSelect">
+        <span class="section-label" id="speakerShapeLabel" hidden>화자 삼각도 화자</span>
+        <select class="speaker-select" id="speakerShapeSelect" hidden>
           <option value="all">화자 선택</option>
         </select>
-        <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
+        <span class="section-label" id="vowelFilterLabel" hidden>특정 모음</span>
+        <div class="vowel-filter-grid" id="vowelFilter" hidden>
+          <button class="vowel-filter-button active" data-vowel="all">전체</button>
+          <button class="vowel-filter-button" data-vowel="ㅣ">ㅣ</button>
+          <button class="vowel-filter-button" data-vowel="ㅔ">ㅔ</button>
+          <button class="vowel-filter-button" data-vowel="ㅐ">ㅐ</button>
+          <button class="vowel-filter-button" data-vowel="ㅏ">ㅏ</button>
+          <button class="vowel-filter-button" data-vowel="ㅓ">ㅓ</button>
+          <button class="vowel-filter-button" data-vowel="ㅡ">ㅡ</button>
+          <button class="vowel-filter-button" data-vowel="ㅗ">ㅗ</button>
+          <button class="vowel-filter-button" data-vowel="ㅜ">ㅜ</button>
+        </div>
+        <div class="filter-summary" id="speakerShapeSummary">전체 분포에서는 화자 연결선을 표시하지 않습니다.</div>
       </div>
     </div>
   </div>
@@ -547,6 +611,7 @@
     let selectedAge = 'all';
     let selectedSpeaker = 'all';
     let selectedVowel = 'all';
+    let selectedView = 'overview';
     let selectedAverageSeries = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
@@ -592,23 +657,34 @@
     const MAX_ZOOM = 4;
     let viewDomain = { ...domain };
 
+    const SPEAKER_ID_RENAMES = { 'K_2009_001': 'K_001' };
+    function renameSpeakerRecord(item) {
+      if (!item || typeof item !== 'object') return item;
+      const oldSpeakerId = String(item.speakerId || '');
+      const newSpeakerId = SPEAKER_ID_RENAMES[oldSpeakerId] || oldSpeakerId;
+      const oldId = String(item.id || '');
+      const newId = newSpeakerId !== oldSpeakerId && oldId.startsWith(oldSpeakerId + '-')
+        ? newSpeakerId + oldId.slice(oldSpeakerId.length)
+        : oldId;
+      return { ...item, speakerId: newSpeakerId, ...(newId ? { id: newId } : {}) };
+    }
     function normalizeData(records) {
       const usedIds = new Set();
       const counters = new Map();
       const normalized = [];
-      records.forEach(item => {
-        if (!item || !item.speakerId || !item.vowel) return;
-        const key = item.speakerId + '::' + item.vowel;
-        const requestedToken = Number(item.tokenNo);
+      (Array.isArray(records) ? records : []).forEach(item => {
+        const record = renameSpeakerRecord(item);
+        if (!record || !record.speakerId || !record.vowel) return;
+        const key = record.speakerId + '::' + record.vowel;
         let tokenNo = (counters.get(key) || 0) + 1;
         while (tokenNo <= (counters.get(key) || 0)) tokenNo += 1;
         counters.set(key, tokenNo);
-        const baseId = item.id || item.speakerId + '-' + item.vowel + '-' + tokenNo;
+        const baseId = record.id || record.speakerId + '-' + record.vowel + '-' + tokenNo;
         let id = baseId;
         let suffix = 2;
         while (usedIds.has(id)) id = baseId + '-' + suffix++;
         usedIds.add(id);
-        normalized.push({ ...item, id, tokenNo });
+        normalized.push({ ...record, id, tokenNo });
       });
       return normalized;
     }
@@ -667,7 +743,7 @@
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (Array.isArray(saved)) {
           const normalized = normalizeData(saved);
-          if (normalized.length !== saved.length) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
           return normalized;
         }
       } catch (e) {}
@@ -855,68 +931,86 @@
       const lineLayer = document.getElementById('speakerLineLayer');
       const summary = document.getElementById('speakerShapeSummary');
       if (!lineLayer) return;
-      const makeShape = (items, label) => {
-        const points = items.map(d => String(xScale(d.f2)) + ',' + String(yScale(d.f1))).join(' ');
-        const nodes = items.map(d => '<text class="speaker-node" x="' + xScale(d.f2) + '" y="' + yScale(d.f1) + '" aria-label="' + esc(d.vowel) + '">' + esc(d.vowel) + '</text>').join('');
-        const closesTriangle = items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ');
+      lineLayer.innerHTML = '';
+      if (selectedView !== 'speaker' || selectedSpeaker === 'all') {
+        if (summary) summary.textContent = selectedView === 'speaker'
+          ? '화자 삼각도 보기에서 화자를 선택하면 회차별 연결선을 표시합니다.'
+          : '전체 분포와 특정 모음값 보기에서는 화자 연결선을 표시하지 않습니다.';
+        return;
+      }
+      const records = filteredData().filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel));
+      const groups = new Map();
+      records.forEach(item => {
+        const repetition = Number(item.tokenNo) || 1;
+        if (!groups.has(repetition)) groups.set(repetition, []);
+        groups.get(repetition).push(item);
+      });
+      const makeShape = (items, repetition) => {
+        const ordered = [...items].sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
+        if (!ordered.length) return '';
+        const points = ordered.map(item => String(xScale(item.f2)) + ',' + String(yScale(item.f1))).join(' ');
+        const closesTriangle = ordered.length >= 3 && ordered.some(item => item.vowel === 'ㅣ') && ordered.some(item => item.vowel === 'ㅡ');
         const shapeTag = closesTriangle ? 'polygon' : 'polyline';
-        const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
-        const shapeColorClass = items[0].gender === 'female' ? ' female-shape' : items[0].gender === 'male' ? ' male-shape' : '';
-        const markup = '<' + shapeTag + ' class="speaker-path' + shapeColorClass + '" points="' + points + '" />' + nodes + '<text class="speaker-label" x="' + (xScale(items[0].f2) + 10) + '" y="' + (yScale(items[0].f1) - 10) + '">' + esc(label) + '</text>';
-        return { markup, count: items.length, closeNotice };
+        const repetitionClass = repetition === 1 ? ' repetition-1' : repetition === 2 ? ' repetition-2' : repetition === 3 ? ' repetition-3' : '';
+        const path = ordered.length >= 2 ? '<' + shapeTag + ' class="speaker-path' + repetitionClass + '" points="' + points + '" />' : '';
+        const nodes = ordered.map(item => '<text class="speaker-node" x="' + xScale(item.f2) + '" y="' + yScale(item.f1) + '" aria-label="' + esc(item.vowel + ' ' + repetition + '회') + '">' + esc(item.vowel) + '</text>').join('');
+        const label = '<text class="speaker-label" x="' + (xScale(ordered[0].f2) + 10) + '" y="' + (yScale(ordered[0].f1) - 10) + '">' + repetition + '회</text>';
+        return path + nodes + label;
       };
-      let shapeData = [];
-      let shapeLabel = '';
-      if (selectedAverageSeries !== 'all') {
-        shapeData = averageDisplayData()
-          .filter(d => averageSeriesKey(d) === selectedAverageSeries && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
-        shapeLabel = shapeData.length ? averageSeriesLabel(shapeData[0]) : '선택한 평균';
-      } else if (selectedSpeaker !== 'all') {
-        shapeData = collapseVowelTokens(filteredData()
-          .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel)))
-          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
-        shapeLabel = selectedSpeaker;
-      } else if (selectedAge === '평균' || selectedAge === 'average') {
-        const grouped = new Map();
-        filteredAverageData()
-          .filter(d => VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-          .forEach(d => {
-            const key = averageSeriesKey(d);
-            if (!grouped.has(key)) grouped.set(key, []);
-            grouped.get(key).push(d);
-          });
-        const genderOrder = { male: 0, female: 1 };
-        const groups = [...grouped.values()]
-          .map(items => items.sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel)))
-          .filter(items => items.length >= 2)
-          .sort((a, b) => (genderOrder[a[0].gender] ?? 9) - (genderOrder[b[0].gender] ?? 9));
-        if (!groups.length) {
-          lineLayer.innerHTML = '';
-          summary.textContent = '남성·여성 평균의 모음값이 2개 이상 입력되면 두 모음 모양을 함께 표시합니다.';
-          return;
-        }
-        const renderedGroups = groups.map(items => makeShape(items, averageSeriesLabel(items[0])));
-        lineLayer.innerHTML = renderedGroups.map(item => item.markup).join('');
-        const labels = groups.map(items => averageSeriesLabel(items[0])).join(' · ');
-        const closeNotice = groups.every(items => items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ'))
-          ? ' ㅡ-ㅣ 선으로 각각 닫힌 모음 삼각도입니다.'
-          : ' 일부 평균은 ㅡ 입력 전까지 열린 순서선으로 표시됩니다.';
-        summary.textContent = labels + ': 각 평균의 전체 모음값을 동시에 연결합니다.' + closeNotice;
-        return;
+      const repetitions = [...groups.keys()].sort((a, b) => a - b);
+      lineLayer.innerHTML = repetitions.map(repetition => makeShape(groups.get(repetition), repetition)).join('');
+      if (summary) {
+        const labels = repetitions.map(repetition => repetition + '회').join(' · ');
+        summary.textContent = selectedSpeaker + ': ' + (labels || '입력된 모음 없음') + ' 값을 각각 연결합니다. 같은 회차의 모음만 연결하며, ㅣ와 ㅡ가 모두 있으면 선을 닫습니다.';
       }
-      if (shapeData.length < 2) {
-        lineLayer.innerHTML = '';
-        summary.textContent = selectedAverageSeries !== 'all' || selectedSpeaker !== 'all'
-          ? (shapeLabel + ': 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.')
-          : '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과를 강조하고 클릭한 화자 또는 평균 집단의 모음 모양을 연결합니다.';
-        return;
-      }
-      const rendered = makeShape(shapeData, shapeLabel);
-      lineLayer.innerHTML = rendered.markup;
-      summary.textContent = shapeLabel + ': ' + rendered.count + '개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.' + rendered.closeNotice;
+    }
+    function renderVowelDataPanel() {
+      const panel = document.getElementById('vowelDataPanel');
+      const body = document.getElementById('vowelDataBody');
+      const title = document.getElementById('vowelDataTitle');
+      const note = document.getElementById('vowelDataNote');
+      if (!panel || !body) return;
+      const active = selectedView === 'vowel' && selectedVowel !== 'all';
+      panel.classList.toggle('hidden', !active);
+      if (!active) return;
+      if (title) title.textContent = '모음 ' + selectedVowel + ' F1·F2 값';
+      const groups = new Map();
+      const addItem = (key, item, config) => {
+        if (!groups.has(key)) groups.set(key, { ...config, items: [] });
+        groups.get(key).items.push(item);
+      };
+      filteredData().filter(item => item.vowel === selectedVowel).forEach(item => {
+        const key = 'speaker|' + item.speakerId + '|' + item.age + '|' + item.gender;
+        addItem(key, item, { label: item.speakerId, age: item.age, gender: item.gender, isAverage: false });
+      });
+      filteredAverageData().filter(item => item.vowel === selectedVowel).forEach(item => {
+        const key = 'average|' + averageSeriesKey(item);
+        addItem(key, { ...item, tokenNo: 1 }, { label: '기준 평균 · ' + (item.averageReference || '기존 평균값'), age: item.age, gender: item.gender, isAverage: true });
+      });
+      const rows = [...groups.values()].sort((a, b) => {
+        if (a.isAverage !== b.isAverage) return a.isAverage ? 1 : -1;
+        return String(a.label).localeCompare(String(b.label), 'ko');
+      });
+      const maxRepetition = Math.max(3, ...rows.flatMap(row => row.items.map(item => Number(item.tokenNo) || 1)));
+      const pairMarkup = item => item
+        ? '<span class="formant-pair"><strong>F1</strong> ' + esc(item.f1) + '<br><strong>F2</strong> ' + esc(item.f2) + '</span>'
+        : '<span class="muted">·</span>';
+      const header = '<tr><th>자료</th><th>연령대</th><th>성별</th>' + Array.from({ length: maxRepetition }, (_, index) => '<th>' + (index === 0 ? '기준값·1회' : (index + 1) + '회') + '</th>').join('') + '</tr>';
+      const bodyMarkup = rows.length
+        ? rows.map(row => {
+            const cells = Array.from({ length: maxRepetition }, (_, index) => {
+              const repetition = index + 1;
+              const item = row.items.find(value => (Number(value.tokenNo) || 1) === repetition);
+              return '<td>' + (row.isAverage && repetition === 1 ? '<span class="formant-pair"><strong>기준값</strong><br>' + pairMarkup(item) + '</span>' : pairMarkup(item)) + '</td>';
+            }).join('');
+            return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td><td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
+          }).join('')
+        : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition) + '">현재 필터에 해당하는 ' + esc(selectedVowel) + ' 값이 없습니다.</td></tr>';
+      body.innerHTML = header + bodyMarkup;
+      if (note) note.textContent = rows.length + '개 자료. 같은 화자의 반복 토큰은 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
     }
     function pointOpacity(d) {
+      if (selectedView === 'vowel') return selectedVowel === 'all' ? 0.28 : d.vowel === selectedVowel ? 1 : 0;
       if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
       if (d.source === 'microphone') return 1;
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 0.16;
@@ -981,6 +1075,8 @@
 
     function render() {
       refreshDataSelectors();
+      syncFilterControls();
+      updateFilterSummary();
       drawGrid();
       const layer = document.getElementById('pointsLayer');
       const visible = filteredData();
@@ -990,7 +1086,7 @@
         const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
         return `<text class='point vowel-point ${pointColorClass(d)}${selectedClass}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='${fontSize}' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`;
       }).join('');
-      const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='11' opacity='1' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
+      const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='11' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
       const micMarkup = micPoint ? `<text class='point vowel-point ${pointColorClass(micPoint)} mic-point' x='${xScale(micPoint.f2)}' y='${yScale(micPoint.f1)}' font-size='12' opacity='1' data-id='${esc(micPoint.id)}' data-vowel='${esc(micPoint.vowel)}' aria-label='${esc(micPoint.vowel)}'>${esc(micPoint.vowel)}</text><text class='mic-label' x='${xScale(micPoint.f2)+11}' y='${yScale(micPoint.f1)-11}'>내 발음</text>` : '';
       layer.innerHTML = corpusPoints + averagePoints + micMarkup;
       layer.querySelectorAll('.point').forEach(point => {
@@ -1003,19 +1099,21 @@
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
           if (!d.vowel) return;
+          selectedView = 'vowel';
           selectedVowel = d.vowel;
           selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
-          selectedSpeaker = d.source === 'average' ? 'all' : d.speakerId || 'all';
+          selectedSpeaker = 'all';
           selectedGender = 'all';
           selectedAge = d.source === 'average' ? (d.age === '평균' ? '평균' : d.age) : 'all';
           document.querySelectorAll('#genderFilter button').forEach(button => button.classList.toggle('active', button.dataset.gender === selectedGender));
           document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === selectedAge));
-          const averageSeriesSelect = document.getElementById('averageSeriesSelect');
-          if (averageSeriesSelect) averageSeriesSelect.value = selectedAverageSeries;
           render();
         });
       });
       drawSpeakerShape();
+      renderVowelDataPanel();
+      const repetitionLegend = document.getElementById('repetitionLegend');
+      if (repetitionLegend) repetitionLegend.classList.toggle('hidden', selectedView !== 'speaker' || selectedSpeaker === 'all');
       applyZoom();
       updateStats(visible.length, visibleAverages.length);
     }
@@ -1054,12 +1152,36 @@
       tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
     }
     function hideTooltip() { tooltip.classList.add('hidden'); }
+    function syncFilterControls() {
+      const viewButtons = document.querySelectorAll('#viewModeFilter button');
+      viewButtons.forEach(button => button.classList.toggle('active', button.dataset.view === selectedView));
+      const speakerMode = selectedView === 'speaker';
+      const vowelMode = selectedView === 'vowel';
+      const speakerLabel = document.getElementById('speakerShapeLabel');
+      const speakerSelect = document.getElementById('speakerShapeSelect');
+      const speakerSummary = document.getElementById('speakerShapeSummary');
+      const vowelLabel = document.getElementById('vowelFilterLabel');
+      const vowelFilter = document.getElementById('vowelFilter');
+      const averageLabel = document.getElementById('averageSeriesLabel');
+      const averageSelect = document.getElementById('averageSeriesSelect');
+      [speakerLabel, speakerSelect, speakerSummary].forEach(element => { if (element) element.hidden = !speakerMode; });
+      [vowelLabel, vowelFilter].forEach(element => { if (element) element.hidden = !vowelMode; });
+      if (averageLabel) averageLabel.hidden = speakerMode;
+      if (averageSelect) averageSelect.hidden = speakerMode;
+      document.querySelectorAll('#vowelFilter button').forEach(button => button.classList.toggle('active', button.dataset.vowel === selectedVowel));
+      const repetitionLegend = document.getElementById('repetitionLegend');
+      if (repetitionLegend) repetitionLegend.classList.toggle('hidden', !speakerMode || selectedSpeaker === 'all');
+    }
     function updateFilterSummary() {
+      const viewLabel = selectedView === 'speaker' ? '화자 삼각도' : selectedView === 'vowel' ? '특정 모음값' : '전체 분포';
       const genderLabel = selectedGender === 'all' ? '성별 전체' : selectedGender === 'female' ? '여성' : '남성';
-      const ageLabel = selectedAge === 'all' ? '연령 전체' : selectedAge === 'average' ? '평균' : selectedAge;
-      const vowelLabel = selectedVowel === 'all' ? '모음 전체' : '모음 ' + selectedVowel;
-      const speakerLabel = selectedSpeaker === 'all' ? '' : ' · ' + selectedSpeaker;
-      const summary = genderLabel + ' · ' + ageLabel + ' · ' + vowelLabel + speakerLabel;
+      const ageLabel = selectedAge === 'all' ? '연령 전체' : selectedAge === 'average' || selectedAge === '평균' ? '평균' : selectedAge;
+      const detailLabel = selectedView === 'speaker'
+        ? (selectedSpeaker === 'all' ? '화자 선택' : selectedSpeaker)
+        : selectedView === 'vowel'
+          ? (selectedVowel === 'all' ? '모음 선택' : '모음 ' + selectedVowel)
+          : '';
+      const summary = viewLabel + ' · ' + genderLabel + ' · ' + ageLabel + (detailLabel ? ' · ' + detailLabel : '');
       const target = document.getElementById('filterSummaryText');
       if (target) target.textContent = summary;
     }
@@ -1567,6 +1689,24 @@
     filterCloseBtn.addEventListener('click', closeFilterModal);
     filterModal.addEventListener('click', e => { if (e.target === filterModal) closeFilterModal(); });
 
+    document.getElementById('viewModeFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      selectedView = button.dataset.view || 'overview';
+      if (selectedView === 'overview') {
+        selectedSpeaker = 'all';
+        selectedVowel = 'all';
+        selectedAverageSeries = 'all';
+      } else if (selectedView === 'speaker') {
+        selectedVowel = 'all';
+        selectedAverageSeries = 'all';
+      } else if (selectedView === 'vowel') {
+        selectedSpeaker = 'all';
+        selectedAverageSeries = 'all';
+      }
+      syncFilterControls();
+      updateFilterSummary();
+      render();
+    });
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
       selectedGender = button.dataset.gender;
@@ -1588,14 +1728,26 @@
       render();
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
+      selectedView = 'speaker';
       selectedSpeaker = e.target.value;
       selectedAverageSeries = 'all';
       selectedVowel = 'all';
+      syncFilterControls();
       updateFilterSummary();
       render();
     });
-
+    document.getElementById('vowelFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      selectedView = 'vowel';
+      selectedVowel = button.dataset.vowel;
+      selectedSpeaker = 'all';
+      selectedAverageSeries = 'all';
+      syncFilterControls();
+      updateFilterSummary();
+      render();
+    });
     document.getElementById('averageSeriesSelect').addEventListener('change', e => {
+      selectedView = 'overview';
       selectedAverageSeries = e.target.value;
       selectedSpeaker = 'all';
       selectedVowel = 'all';
@@ -1603,6 +1755,7 @@
         selectedAge = '평균';
         document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === '평균'));
       }
+      syncFilterControls();
       updateFilterSummary();
       render();
     });
