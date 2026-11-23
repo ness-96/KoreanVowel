@@ -613,6 +613,7 @@
     let selectedSpeaker = 'all';
     let selectedVowel = 'all';
     let selectedView = 'overview';
+    let pointSelectionReturnState = null;
     let selectedAverageSeries = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
@@ -1102,6 +1103,7 @@
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
           if (!d.vowel) return;
+          if (!pointSelectionReturnState) pointSelectionReturnState = { selectedView, selectedVowel, selectedSpeaker, selectedAverageSeries, selectedGender, selectedAge };
           selectedView = 'vowel';
           selectedVowel = d.vowel;
           selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
@@ -1694,6 +1696,7 @@
 
     document.getElementById('viewModeFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedView = button.dataset.view || 'overview';
       if (selectedView === 'overview') {
         selectedSpeaker = 'all';
@@ -1712,6 +1715,7 @@
     });
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedGender = button.dataset.gender;
       selectedAverageSeries = 'all';
       selectedSpeaker = 'all';
@@ -1722,6 +1726,7 @@
     });
     document.getElementById('ageFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedAge = button.dataset.age;
       selectedAverageSeries = 'all';
       selectedSpeaker = 'all';
@@ -1731,6 +1736,7 @@
       render();
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
+      pointSelectionReturnState = null;
       selectedView = 'speaker';
       selectedSpeaker = e.target.value;
       selectedAverageSeries = 'all';
@@ -1741,6 +1747,7 @@
     });
     document.getElementById('vowelFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedView = 'vowel';
       selectedVowel = button.dataset.vowel;
       selectedSpeaker = 'all';
@@ -1750,6 +1757,7 @@
       render();
     });
     document.getElementById('averageSeriesSelect').addEventListener('change', e => {
+      pointSelectionReturnState = null;
       selectedView = 'overview';
       selectedAverageSeries = e.target.value;
       selectedSpeaker = 'all';
@@ -2120,20 +2128,45 @@
       zoomAt(point.x, point.y, factor);
       render();
     }, { passive: false });
+    function resetDistributionSelection() {
+      if (selectedView === 'overview' && selectedVowel === 'all' && selectedSpeaker === 'all' && selectedAverageSeries === 'all' && !pointSelectionReturnState) return;
+      const previous = pointSelectionReturnState;
+      pointSelectionReturnState = null;
+      if (previous) {
+        selectedView = previous.selectedView;
+        selectedVowel = previous.selectedVowel;
+        selectedSpeaker = previous.selectedSpeaker;
+        selectedAverageSeries = previous.selectedAverageSeries;
+        selectedGender = previous.selectedGender;
+        selectedAge = previous.selectedAge;
+      } else {
+        selectedView = 'overview';
+        selectedVowel = 'all';
+        selectedSpeaker = 'all';
+        selectedAverageSeries = 'all';
+      }
+      render();
+    }
     svg.addEventListener('pointerdown', e => {
       if (e.target.closest('.point')) return;
-      drag = { point: getSvgPoint(e), viewDomain: { ...viewDomain } };
+      drag = { point: getSvgPoint(e), viewDomain: { ...viewDomain }, moved: false, target: e.target };
       svg.setPointerCapture(e.pointerId);
       svg.style.cursor = 'grabbing';
     });
     svg.addEventListener('pointermove', e => {
       if (!drag) return;
       const point = getSvgPoint(e);
+      if (Math.abs(point.x - drag.point.x) > 3 || Math.abs(point.y - drag.point.y) > 3) drag.moved = true;
       viewDomain = { ...drag.viewDomain };
       panBy(point.x - drag.point.x, point.y - drag.point.y);
       render();
     });
-    svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
+    svg.addEventListener('pointerup', () => {
+      const finishedDrag = drag;
+      drag = null;
+      svg.style.cursor = 'default';
+      if (finishedDrag && !finishedDrag.moved && !finishedDrag.target.closest('.point, .speaker-path, .speaker-node, .speaker-label')) resetDistributionSelection();
+    });
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
 
     renderBatchInputGrid();
