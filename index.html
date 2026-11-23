@@ -600,7 +600,7 @@
         if (!item || !item.speakerId || !item.vowel) return;
         const key = item.speakerId + '::' + item.vowel;
         const requestedToken = Number(item.tokenNo);
-        let tokenNo = Number.isInteger(requestedToken) && requestedToken > 0 ? requestedToken : (counters.get(key) || 0) + 1;
+        let tokenNo = (counters.get(key) || 0) + 1;
         while (tokenNo <= (counters.get(key) || 0)) tokenNo += 1;
         counters.set(key, tokenNo);
         const baseId = item.id || item.speakerId + '-' + item.vowel + '-' + tokenNo;
