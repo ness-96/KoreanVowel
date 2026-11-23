@@ -140,6 +140,20 @@ begin
     update public.vowel_tokens set deleted_at = now() where id = any(p_ids) and deleted_at is null;
   end if;
   get diagnostics deleted_count = row_count;
+  with ranked as (
+    select id,
+           row_number() over (
+             partition by speaker_id, vowel
+             order by token_no, created_at, id
+           )::integer as new_token_no
+    from public.vowel_tokens
+    where deleted_at is null
+  )
+  update public.vowel_tokens as v
+  set token_no = ranked.new_token_no
+  from ranked
+  where v.id = ranked.id
+    and v.token_no <> ranked.new_token_no;
   select public.vowel_token_json() into rows_json;
   return jsonb_build_object('ok', true, 'deletedCount', deleted_count, 'speakerData', rows_json, 'averageData', '[]'::jsonb);
 end;
