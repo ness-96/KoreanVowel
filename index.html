@@ -30,6 +30,7 @@
     }
     button, input, select { font: inherit; }
     button { cursor: pointer; }
+    *[hidden] { display: none !important; }
 
     .app-shell { min-height: 100vh; }
     .topbar {
@@ -495,7 +496,7 @@
       <div class="filter-dialog-head">
         <div>
           <div class="panel-title" id="filterModalTitle">분포 필터</div>
-          <div class="panel-caption">성별·연령대·평균 출처·화자 모양을 선택합니다.</div>
+          <div class="panel-caption">보기 방식과 성별·연령대·평균 출처를 선택합니다.</div>
         </div>
         <button class="filter-dialog-close" type="button" id="filterCloseBtn" aria-label="분포 필터 닫기">×</button>
       </div>
@@ -1006,7 +1007,7 @@
             return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td><td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
           }).join('')
         : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition) + '">현재 필터에 해당하는 ' + esc(selectedVowel) + ' 값이 없습니다.</td></tr>';
-      body.innerHTML = header + bodyMarkup;
+      body.innerHTML = bodyMarkup;
       if (note) note.textContent = rows.length + '개 자료. 같은 화자의 반복 토큰은 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
     }
     function pointOpacity(d) {
