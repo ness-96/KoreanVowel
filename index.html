@@ -660,6 +660,7 @@
     let viewDomain = { ...domain };
 
     const SPEAKER_ID_RENAMES = { 'K_2009_001': 'K_001' };
+    const SPEAKER_SWAP_MIGRATION_KEY = 'vowel-space-prototype-v2-speaker-swap-k001-k002';
     function renameSpeakerRecord(item) {
       if (!item || typeof item !== 'object') return item;
       const oldSpeakerId = String(item.speakerId || '');
@@ -669,6 +670,18 @@
         ? newSpeakerId + oldId.slice(oldSpeakerId.length)
         : oldId;
       return { ...item, speakerId: newSpeakerId, ...(newId ? { id: newId } : {}) };
+    }
+    function swapSpeakerPairRecords(records) {
+      return (Array.isArray(records) ? records : []).map(item => {
+        if (!item || typeof item !== 'object') return item;
+        const oldSpeakerId = String(item.speakerId || '');
+        const newSpeakerId = oldSpeakerId === 'K_001' ? 'K_002' : oldSpeakerId === 'K_002' ? 'K_001' : oldSpeakerId;
+        const oldId = String(item.id || '');
+        const newId = newSpeakerId !== oldSpeakerId && oldId.startsWith(oldSpeakerId + '-')
+          ? newSpeakerId + oldId.slice(oldSpeakerId.length)
+          : oldId;
+        return { ...item, speakerId: newSpeakerId, ...(newId ? { id: newId } : {}) };
+      });
     }
     function normalizeData(records) {
       const usedIds = new Set();
@@ -744,10 +757,14 @@
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (Array.isArray(saved)) {
-          const normalized = normalizeData(saved);
+          const shouldSwapSpeakerPair = !localStorage.getItem(SPEAKER_SWAP_MIGRATION_KEY);
+          const migrated = shouldSwapSpeakerPair ? swapSpeakerPairRecords(saved) : saved;
+          const normalized = normalizeData(migrated);
           if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          if (shouldSwapSpeakerPair) localStorage.setItem(SPEAKER_SWAP_MIGRATION_KEY, 'done');
           return normalized;
         }
+        localStorage.setItem(SPEAKER_SWAP_MIGRATION_KEY, 'done');
       } catch (e) {}
       return [];
     }
