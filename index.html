@@ -537,7 +537,7 @@
         <select class="speaker-select" id="speakerShapeSelect" hidden>
           <option value="all">화자 선택</option>
         </select>
-        <span class="section-label" id="vowelFilterLabel" hidden>특정 모음</span>
+        <span class="section-label" id="vowelFilterLabel" hidden>특정 모음(복수 선택)</span>
         <div class="vowel-filter-grid" id="vowelFilter" hidden>
           <button class="vowel-filter-button active" data-vowel="all">전체</button>
           <button class="vowel-filter-button" data-vowel="ㅣ">ㅣ</button>
@@ -615,7 +615,7 @@
     let selectedGender = 'all';
     let selectedAge = 'all';
     let selectedSpeaker = 'all';
-    let selectedVowel = 'all';
+    let selectedVowels = [];
     let selectedView = 'overview';
     let selectedRepetition = 'all';
     let pointSelectionReturnState = null;
@@ -897,6 +897,15 @@
       if (selectedAge === 'average') return d.age === '평균' || d.age === 'average' || isLegacyAverageSpeaker(d);
       return d.age === selectedAge;
     }
+    function hasSelectedVowels() {
+      return selectedVowels.length > 0;
+    }
+    function isVowelSelected(vowel) {
+      return selectedVowels.includes(vowel);
+    }
+    function selectedVowelLabel() {
+      return selectedVowels.length ? selectedVowels.join(', ') : '모음 선택';
+    }
     function filteredData() {
       return data.filter(d => !isLegacyAverageSpeaker(d) && (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
@@ -1008,32 +1017,35 @@
       const title = document.getElementById('vowelDataTitle');
       const note = document.getElementById('vowelDataNote');
       if (!panel || !body || !head) return;
-      const active = selectedView === 'vowel' && selectedVowel !== 'all';
+      const active = selectedView === 'vowel' && hasSelectedVowels();
       panel.classList.toggle('hidden', !active);
       if (!active) return;
-      if (title) title.textContent = '모음 ' + selectedVowel + ' F1·F2 값';
+      const multipleVowels = selectedVowels.length > 1;
+      const selectedLabel = selectedVowelLabel();
+      if (title) title.textContent = '모음 ' + selectedLabel + ' F1·F2 값';
       const groups = new Map();
       const addItem = (key, item, config) => {
         if (!groups.has(key)) groups.set(key, { ...config, items: [] });
         groups.get(key).items.push(item);
       };
-      filteredData().filter(item => item.vowel === selectedVowel).forEach(item => {
-        const key = 'speaker|' + item.speakerId + '|' + item.age + '|' + item.gender;
-        addItem(key, item, { label: item.speakerId, age: item.age, gender: item.gender, isAverage: false });
+      filteredData().filter(item => isVowelSelected(item.vowel)).forEach(item => {
+        const key = 'speaker|' + item.speakerId + '|' + item.age + '|' + item.gender + '|' + item.vowel;
+        addItem(key, item, { label: item.speakerId, vowel: item.vowel, age: item.age, gender: item.gender, isAverage: false });
       });
-      filteredAverageData().filter(item => item.vowel === selectedVowel).forEach(item => {
-        const key = 'average|' + averageSeriesKey(item);
-        addItem(key, { ...item, tokenNo: 1 }, { label: '기준 평균 · ' + (item.averageReference || '기존 평균값'), age: item.age, gender: item.gender, isAverage: true });
+      filteredAverageData().filter(item => isVowelSelected(item.vowel)).forEach(item => {
+        const key = 'average|' + averageSeriesKey(item) + '|' + item.vowel;
+        addItem(key, { ...item, tokenNo: 1 }, { label: '기준 평균 · ' + (item.averageReference || '기존 평균값'), vowel: item.vowel, age: item.age, gender: item.gender, isAverage: true });
       });
       const rows = [...groups.values()].sort((a, b) => {
         if (a.isAverage !== b.isAverage) return a.isAverage ? 1 : -1;
-        return String(a.label).localeCompare(String(b.label), 'ko');
+        const labelCompare = String(a.label).localeCompare(String(b.label), 'ko');
+        return labelCompare || VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel);
       });
       const maxRepetition = Math.max(3, ...rows.flatMap(row => row.items.map(item => Number(item.tokenNo) || 1)));
       const pairMarkup = item => item
         ? '<span class="formant-pair"><strong>F1</strong> ' + esc(item.f1) + '<br><strong>F2</strong> ' + esc(item.f2) + '</span>'
         : '<span class="muted">·</span>';
-      const header = '<tr><th>자료</th><th>연령대</th><th>성별</th>' + Array.from({ length: maxRepetition }, (_, index) => '<th>' + (index === 0 ? '기준값·1회' : (index + 1) + '회') + '</th>').join('') + '</tr>';
+      const header = '<tr><th>자료</th>' + (multipleVowels ? '<th>모음</th>' : '') + '<th>연령대</th><th>성별</th>' + Array.from({ length: maxRepetition }, (_, index) => '<th>' + (index === 0 ? '기준값·1회' : (index + 1) + '회') + '</th>').join('') + '</tr>';
       const bodyMarkup = rows.length
         ? rows.map(row => {
             const cells = Array.from({ length: maxRepetition }, (_, index) => {
@@ -1041,16 +1053,17 @@
               const item = row.items.find(value => (Number(value.tokenNo) || 1) === repetition);
               return '<td>' + (row.isAverage && repetition === 1 ? '<span class="formant-pair"><strong>기준값</strong><br>' + pairMarkup(item) + '</span>' : pairMarkup(item)) + '</td>';
             }).join('');
-            return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td><td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
+            const vowelCell = multipleVowels ? '<td>' + esc(row.vowel) + '</td>' : '';
+            return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td>' + vowelCell + '<td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
           }).join('')
-        : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition) + '">현재 필터에 해당하는 ' + esc(selectedVowel) + ' 값이 없습니다.</td></tr>';
+        : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition + (multipleVowels ? 1 : 0)) + '">현재 필터에 해당하는 ' + esc(selectedLabel) + ' 값이 없습니다.</td></tr>';
       head.innerHTML = header;
       body.innerHTML = bodyMarkup;
-      if (note) note.textContent = rows.length + '개 자료. 같은 화자의 반복 토큰은 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
+      if (note) note.textContent = rows.length + '개 자료. 선택한 모음별로 같은 화자의 반복 토큰을 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
     }
     function pointOpacity(d) {
-      if (selectedView === 'vowel') return selectedVowel === 'all' ? 0.28 : d.vowel === selectedVowel ? 1 : 0;
-      if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
+      if (selectedView === 'vowel') return hasSelectedVowels() ? (isVowelSelected(d.vowel) ? 1 : 0) : 0.28;
+      if (hasSelectedVowels()) return isVowelSelected(d.vowel) ? 1 : 0.28;
       if (d.source === 'microphone') return 1;
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 0.16;
       if (selectedGender === 'all') return 0.82;
@@ -1058,7 +1071,7 @@
     }
     function pointColorClass(d) {
       if (d.source === 'microphone') return 'mic-point';
-      if (selectedVowel !== 'all' && d.vowel !== selectedVowel) return 'muted-point';
+      if (hasSelectedVowels() && !isVowelSelected(d.vowel)) return 'muted-point';
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
     }
@@ -1138,9 +1151,9 @@
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
           if (!d.vowel) return;
-          if (!pointSelectionReturnState) pointSelectionReturnState = { selectedView, selectedVowel, selectedSpeaker, selectedAverageSeries, selectedGender, selectedAge, selectedRepetition };
+          if (!pointSelectionReturnState) pointSelectionReturnState = { selectedView, selectedVowels: [...selectedVowels], selectedSpeaker, selectedAverageSeries, selectedGender, selectedAge, selectedRepetition };
           selectedView = 'vowel';
-          selectedVowel = d.vowel;
+          selectedVowels = [d.vowel];
           selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
           selectedSpeaker = 'all';
           selectedGender = 'all';
@@ -1208,7 +1221,7 @@
       [vowelLabel, vowelFilter].forEach(element => { if (element) element.hidden = !vowelMode; });
       if (averageLabel) averageLabel.hidden = speakerMode;
       if (averageSelect) averageSelect.hidden = speakerMode;
-      document.querySelectorAll('#vowelFilter button').forEach(button => button.classList.toggle('active', button.dataset.vowel === selectedVowel));
+      document.querySelectorAll('#vowelFilter button').forEach(button => button.classList.toggle('active', button.dataset.vowel === 'all' ? !hasSelectedVowels() : isVowelSelected(button.dataset.vowel)));
       syncRepetitionLegend();
     }
     function updateFilterSummary() {
@@ -1218,7 +1231,7 @@
       const detailLabel = selectedView === 'speaker'
         ? (selectedSpeaker === 'all' ? '화자 선택' : selectedSpeaker)
         : selectedView === 'vowel'
-          ? (selectedVowel === 'all' ? '모음 선택' : '모음 ' + selectedVowel)
+          ? selectedVowelLabel()
           : '';
       const summary = viewLabel + ' · ' + genderLabel + ' · ' + ageLabel + (detailLabel ? ' · ' + detailLabel : '');
       const target = document.getElementById('filterSummaryText');
@@ -1735,10 +1748,10 @@
       selectedRepetition = 'all';
       if (selectedView === 'overview') {
         selectedSpeaker = 'all';
-        selectedVowel = 'all';
+        selectedVowels = [];
         selectedAverageSeries = 'all';
       } else if (selectedView === 'speaker') {
-        selectedVowel = 'all';
+        selectedVowels = [];
         selectedAverageSeries = 'all';
       } else if (selectedView === 'vowel') {
         selectedSpeaker = 'all';
@@ -1771,7 +1784,7 @@
       selectedView = 'speaker';
       selectedSpeaker = e.target.value;
       selectedAverageSeries = 'all';
-      selectedVowel = 'all';
+      selectedVowels = [];
       selectedRepetition = 'all';
       syncFilterControls();
       updateFilterSummary();
@@ -1781,7 +1794,15 @@
       const button = e.target.closest('button'); if (!button) return;
       pointSelectionReturnState = null;
       selectedView = 'vowel';
-      selectedVowel = button.dataset.vowel;
+      const vowel = button.dataset.vowel;
+      if (vowel === 'all') {
+        selectedVowels = [];
+      } else {
+        const next = selectedVowels.includes(vowel)
+          ? selectedVowels.filter(value => value !== vowel)
+          : [...selectedVowels, vowel];
+        selectedVowels = VOWELS.filter(value => next.includes(value));
+      }
       selectedSpeaker = 'all';
       selectedAverageSeries = 'all';
       selectedRepetition = 'all';
@@ -1794,7 +1815,7 @@
       selectedView = 'overview';
       selectedAverageSeries = e.target.value;
       selectedSpeaker = 'all';
-      selectedVowel = 'all';
+      selectedVowels = [];
       selectedRepetition = 'all';
       if (selectedAverageSeries !== 'all') {
         selectedAge = '평균';
@@ -2170,12 +2191,12 @@
       render();
     }, { passive: false });
     function resetDistributionSelection() {
-      if (selectedView === 'overview' && selectedVowel === 'all' && selectedSpeaker === 'all' && selectedAverageSeries === 'all' && selectedRepetition === 'all' && !pointSelectionReturnState) return;
+      if (selectedView === 'overview' && selectedVowels.length === 0 && selectedSpeaker === 'all' && selectedAverageSeries === 'all' && selectedRepetition === 'all' && !pointSelectionReturnState) return;
       const previous = pointSelectionReturnState;
       pointSelectionReturnState = null;
       if (previous) {
         selectedView = previous.selectedView;
-        selectedVowel = previous.selectedVowel;
+        selectedVowels = Array.isArray(previous.selectedVowels) ? [...previous.selectedVowels] : [];
         selectedSpeaker = previous.selectedSpeaker;
         selectedAverageSeries = previous.selectedAverageSeries;
         selectedGender = previous.selectedGender;
@@ -2183,7 +2204,7 @@
         selectedRepetition = previous.selectedRepetition || 'all';
       } else {
         selectedView = 'overview';
-        selectedVowel = 'all';
+        selectedVowels = [];
         selectedSpeaker = 'all';
         selectedAverageSeries = 'all';
         selectedRepetition = 'all';
