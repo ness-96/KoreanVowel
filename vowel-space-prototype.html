@@ -30,6 +30,7 @@
     }
     button, input, select { font: inherit; }
     button { cursor: pointer; }
+    *[hidden] { display: none !important; }
 
     .app-shell { min-height: 100vh; }
     .topbar {
@@ -79,6 +80,10 @@
     .card-title { margin-top: 7px; font-size: 23px; letter-spacing: -.05em; }
     .card-description { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 680px; }
     .metric-box { min-width: 126px; padding: 12px 14px; border-radius: 14px; background: #f7f9fc; text-align: right; }
+    .summary-box { min-width: 340px; text-align: left; }
+    .summary-box .mini-stats { margin-top: 8px; gap: 5px; }
+    .summary-box .mini-stat { padding: 8px 5px; }
+    .summary-box .mini-stat strong { font-size: 15px; }
     .metric-label { color: var(--muted); font-size: 11px; }
     .metric-value { margin-top: 3px; font-size: 22px; font-weight: 800; color: var(--navy); }
 
@@ -104,10 +109,22 @@
     .speaker-path.female-shape { stroke: var(--red); }
     .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 1px; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
-    .point.mic-point { fill: #315fc4; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
+    .point.mic-point { fill: #2f9d68; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
     .point.average-point { stroke: none; stroke-width: 0; stroke-dasharray: none; font-size: 11px; }
     .average-label { fill: #1f3150; font-size: 10px; font-weight: 800; pointer-events: none; }
-    .mic-label { fill: #315fc4; font-size: 11px; font-weight: 800; pointer-events: none; }
+    .mic-label { fill: #2f9d68; font-size: 11px; font-weight: 800; pointer-events: none; }
+    .reference-zone { stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+    .reference-zone.male-zone { fill: #9ed9ff; fill-opacity: .2; stroke: #72c4f3; }
+    .reference-zone.female-zone { fill: #f7b7c8; fill-opacity: .2; stroke: #eb99ae; }
+    .reference-zone-label { font-size: 10px; font-weight: 800; pointer-events: none; }
+    .reference-zone-label.male-zone { fill: #378abb; }
+    .reference-zone-label.female-zone { fill: #c4687f; }
+    .reference-zone-distance { fill: none; stroke-width: 1.7; stroke-dasharray: 4 4; opacity: .78; pointer-events: none; }
+    .reference-zone-distance.male-zone { stroke: #58afe8; }
+    .reference-zone-distance.female-zone { stroke: #df7892; }
+    .reference-zone-distance-dot { stroke: #fff; stroke-width: 1; pointer-events: none; }
+    .reference-zone-distance-dot.male-zone { fill: #58afe8; }
+    .reference-zone-distance-dot.female-zone { fill: #df7892; }
     .speaker-select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fbfcfe; outline: none; font-size: 12px; }
     .speaker-select:focus { border-color: #85a4e8; box-shadow: 0 0 0 3px #edf3ff; }
     .danger-button { color: #c7464f; border-color: #f0c4c7; background: #fff8f8; }
@@ -133,13 +150,36 @@
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     .legend-dot.red { background: var(--red); }
     .legend-dot.male { background: #4e7cf3; }
-    .legend-dot.blue { background: #315fc4; }
+    .legend-dot.green { background: #2f9d68; }
     .legend-dot.average { background: #fff; border: 2px dashed #1f3150; }
     .status-pill { margin-left: auto; color: #4e6a92; background: #edf4ff; padding: 6px 9px; border-radius: 8px; }
 
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
     .panel { padding: 19px; }
     .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+    .filter-launch { margin: 0 26px 14px; }
+    .filter-launch-button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid #d9e2ef; border-radius: 10px; background: #f8faff; color: var(--navy); text-align: left; cursor: pointer; transition: .18s ease; }
+    .filter-launch-button:hover { border-color: #9eb7e8; background: #f2f6ff; }
+    .filter-launch-button:focus-visible { outline: 2px solid #7ea3ee; outline-offset: 2px; }
+    .filter-launch-title { font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .filter-launch-summary { min-width: 0; overflow: hidden; color: #718096; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .filter-launch-icon { margin-left: auto; color: #718096; font-size: 16px; line-height: 1; }
+    .filter-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(20, 29, 43, .42); }
+    .filter-backdrop.hidden { display: none; }
+    .filter-dialog { width: min(360px, 100%); max-height: min(560px, calc(100vh - 32px)); overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 24px 70px rgba(22, 35, 58, .28); }
+    .filter-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .filter-dialog-close { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #718096; font-size: 18px; line-height: 1; cursor: pointer; }
+    .filter-dialog-close:hover { background: #f7f9fc; }
+    .filter-dialog-body { margin-top: 2px; }
+    .protected-panel { padding: 0; overflow: hidden; }
+    .panel-toggle { width: 100%; margin: 0; padding: 19px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+    .panel-toggle:hover { background: #fbfcfe; }
+    .panel-toggle:focus-visible { outline: 2px solid #7ea3ee; outline-offset: -2px; }
+    .panel-toggle-label { min-width: 0; }
+    .panel-toggle-label .panel-caption { display: block; }
+    .panel-toggle-icon { flex: 0 0 auto; color: #718096; font-size: 20px; line-height: 1; }
+    .panel-body { padding: 0 19px 19px; }
+    .panel-body[hidden] { display: none; }
     .panel-title { font-size: 15px; font-weight: 800; letter-spacing: -.03em; }
     .panel-caption { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .section-label { display: block; color: #708097; font-size: 11px; font-weight: 800; margin: 15px 0 8px; }
@@ -154,7 +194,37 @@
     .age-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .age-button.active { color: var(--navy); background: #eaf1ff; border-color: #a9c1f5; }
     .filter-summary { margin-top: 14px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #65748a; font-size: 11px; line-height: 1.5; }
-
+    .view-mode-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+    .view-mode-button, .vowel-filter-button { min-height: 32px; padding: 7px 6px; border: 1px solid #d9e2ef; border-radius: 8px; background: #fff; color: #607089; font-size: 11px; font-weight: 700; }
+    .view-mode-button.active, .vowel-filter-button.active { border-color: #7ea3ee; background: #eef4ff; color: #294a89; }
+    .vowel-filter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; }
+    .vowel-data-panel { margin: 14px 26px 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcff; }
+    .vowel-data-panel.hidden { display: none; }
+    .vowel-data-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+    .vowel-data-note { margin-top: 4px; color: #718096; font-size: 11px; line-height: 1.45; }
+    .vowel-data-table-wrap { overflow-x: auto; }
+    .vowel-data-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 11px; }
+    .vowel-data-table th, .vowel-data-table td { padding: 9px 8px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: middle; white-space: nowrap; }
+    .vowel-data-table th { color: #607089; background: #f4f7fb; font-weight: 800; }
+    .vowel-data-table td { color: #27364c; }
+    .vowel-data-table .formant-pair { line-height: 1.35; }
+    .vowel-data-table .formant-pair strong { color: #294a89; font-weight: 800; }
+    .vowel-data-table .average-row td { background: #fffdf6; }
+    .vowel-data-empty { padding: 18px 8px !important; color: #718096 !important; text-align: center !important; }
+    .repeat-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .repeat-legend.hidden { display: none; }
+    .repeat-legend-item { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; padding: 3px 5px; border-radius: 6px; color: #607089; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; transition: .16s ease; }
+    .repeat-legend-item:hover { background: #f1f4f8; color: #294a89; }
+    .repeat-legend-item.active { background: #eef3fb; color: #294a89; }
+    .repeat-legend-item.inactive { opacity: .32; }
+    .repeat-line { display: inline-block; width: 18px; height: 0; border-top: 3px solid #294a89; }
+    .repeat-line.repeat-2 { border-top-color: #d66a32; border-top-style: dashed; }
+    .repeat-line.repeat-3 { border-top-color: #2f9d68; border-top-style: dotted; }
+    .speaker-path.repetition-1 { stroke: #294a89; }
+    .speaker-path.repetition-2 { stroke: #d66a32; stroke-dasharray: 8 5; }
+    .speaker-path.repetition-3 { stroke: #2f9d68; stroke-dasharray: 2 5; }
+    .speaker-path.repetition-muted, .speaker-node.repetition-muted, .speaker-label.repetition-muted { opacity: .18; }
+    @media (max-width: 760px) { .vowel-data-panel { margin: 14px 10px 0; } .vowel-data-head { display: block; } .repeat-legend { margin-top: 10px; } }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
     .field.full { grid-column: 1 / -1; }
     .batch-input-heading { display: flex; align-items: baseline; justify-content: space-between; margin-top: 15px; color: #708097; font-size: 11px; font-weight: 800; }
@@ -193,9 +263,34 @@
     .mic-prompt { margin-top: 10px; padding: 12px; border-radius: 10px; background: #f4f7ff; color: #304b7a; font-size: 13px; font-weight: 700; line-height: 1.55; }
     .mic-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
     .mic-actions .submit-button, .mic-actions .secondary-button { margin-top: 0; }
+    .continuous-mic-actions { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+    .mic-live-indicator { min-width: 54px; padding: 9px 10px; border-radius: 9px; background: #f4f6f9; color: #8b97a7; font-size: 11px; font-weight: 800; text-align: center; }
+    .mic-live-indicator.on { color: #247a50; background: #eaf8f0; }
+
     .mic-status { margin-top: 10px; color: #60718a; font-size: 11px; line-height: 1.5; }
-    .mic-result { margin-top: 8px; padding: 10px 11px; border-radius: 10px; background: #f7f9fc; color: #53657e; font-size: 11px; line-height: 1.55; }
-    .mic-result strong { color: #315fc4; }
+    .reference-zone-panel { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .reference-zone-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .reference-zone-head strong { color: var(--navy); font-size: 11px; }
+    .reference-zone-status { color: #8995a6; font-size: 10px; }
+    .reference-zone-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 9px; }
+    .reference-zone-control { display: inline-flex; align-items: center; gap: 5px; color: #60718a; font-size: 10px; font-weight: 700; }
+    .reference-zone-control input { accent-color: #506d9f; }
+    .zone-swatch { display: inline-block; width: 13px; height: 8px; border-radius: 3px; border: 1px solid currentColor; }
+    .zone-swatch.male-zone { color: #67b9ef; background: rgba(128, 207, 255, .28); }
+    .zone-swatch.female-zone { color: #ea94aa; background: rgba(247, 176, 194, .28); }
+    .reference-zone-note { margin-top: 8px; color: #8995a6; font-size: 10px; line-height: 1.5; }
+    .reference-zone-relation { margin-top: 7px; color: #60718a; font-size: 10px; line-height: 1.5; }
+    .mic-formant-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+    .mic-formant-value { padding: 10px 12px; border: 1px solid #edf0f4; border-radius: 10px; background: #f7f9fc; }
+    .mic-formant-value span { display: block; color: #718096; font-size: 10px; font-weight: 800; }
+    .mic-formant-value strong { display: inline-block; margin-top: 3px; color: var(--navy); font-size: 20px; line-height: 1; }
+    .mic-formant-value small { margin-left: 3px; color: #8c98a8; font-size: 10px; }
+    .mic-spectrum-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .mic-spectrum-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: #65748a; font-size: 10px; font-weight: 800; }
+    .mic-spectrum-head span:last-child { color: #9aa6b6; font-weight: 600; text-align: right; }
+    #micSpectrum { display: block; width: 100%; height: 170px; border-radius: 8px; background: #fff; }
+    .mic-spectrum-note { margin-top: 6px; color: #8b97a7; font-size: 10px; line-height: 1.45; }
+
     .mini-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
     .mini-stat { padding: 11px 8px; border-radius: 10px; background: #f7f9fc; text-align: center; }
     .mini-stat strong { display: block; font-size: 17px; color: var(--navy); }
@@ -227,8 +322,8 @@
       .brand-sub { display: none; }
       .layout { padding: 16px 12px 28px; }
       .sidebar { display: flex; }
-      .card-head { padding: 19px 18px 12px; }
-      .metric-box { display: none; }
+      .card-head { padding: 19px 18px 12px; flex-direction: column; }
+      .metric-box { display: block; width: 100%; min-width: 0; }
       .chart-wrap { margin: 0 6px; min-height: 500px; }
       #chart { height: 500px; }
       .batch-input-grid { gap: 7px; }
@@ -262,10 +357,23 @@
             <h1 class="card-title">한국인 화자 F1·F2 모음 분포</h1>
             <p class="card-description">모음 문자에 커서를 올리면 화자 정보가 표시됩니다. 오른쪽 패널에서 성별과 연령대를 선택하고, 휠로 공간을 확대·축소해 보세요.</p>
           </div>
-          <div class="metric-box">
-            <div class="metric-label">현재 표시 모음</div>
-            <div class="metric-value" id="pointCount">0</div>
+          <div class="metric-box summary-box">
+            <div class="metric-label">현재 데이터 요약</div>
+            <div class="mini-stats">
+              <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
+              <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
+              <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
+              <div class="mini-stat"><strong id="averageCount">0</strong><span>평균값</span></div>
+            </div>
           </div>
+        </div>
+
+        <div class="filter-launch">
+          <button class="filter-launch-button" type="button" id="filterToggle" aria-haspopup="dialog" aria-controls="filterModal">
+            <span class="filter-launch-title">분포 필터</span>
+            <span class="filter-launch-summary" id="filterSummaryText">전체 분포 · 성별 전체 · 연령 전체</span>
+            <span class="filter-launch-icon" aria-hidden="true">⌄</span>
+          </button>
         </div>
 
         <div class="chart-wrap" id="chartWrap">
@@ -288,51 +396,37 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot male"></span>남성</span>
-          <span class="legend-item"><span class="legend-dot blue"></span>내 발음(예비 분석)</span>
+          <span class="legend-item"><span class="legend-dot green"></span>내 발음(Praat 서버)</span>
           <span class="legend-item"><span class="legend-dot average"></span>연령대·성별 평균</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
+          <span class="repeat-legend hidden" id="repetitionLegend">
+            <button type="button" class="repeat-legend-item" data-repetition="1" aria-pressed="false"><span class="repeat-line"></span>1회</button>
+            <button type="button" class="repeat-legend-item" data-repetition="2" aria-pressed="false"><span class="repeat-line repeat-2"></span>2회</button>
+            <button type="button" class="repeat-legend-item" data-repetition="3" aria-pressed="false"><span class="repeat-line repeat-3"></span>3회</button>
+          </span>
         </div>
+        <section class="vowel-data-panel hidden" id="vowelDataPanel" aria-live="polite">
+          <div class="vowel-data-head">
+            <div>
+              <div class="panel-title" id="vowelDataTitle">특정 모음값</div>
+              <div class="vowel-data-note" id="vowelDataNote"></div>
+            </div>
+          </div>
+          <div class="vowel-data-table-wrap">
+            <table class="vowel-data-table">
+              <thead id="vowelDataHead"><tr><th>자료</th><th>연령대</th><th>성별</th><th>1회</th><th>2회</th><th>3회</th></tr></thead>
+              <tbody id="vowelDataBody"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <aside class="sidebar">
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">분포 필터</div>
-              <div class="panel-caption">성별과 연령대별로 표시 범위를 바꿉니다.</div>
-            </div>
-          </div>
-          <span class="section-label">성별</span>
-          <div class="segmented" id="genderFilter">
-            <button class="active" data-gender="all">전체</button>
-            <button data-gender="female">여성</button>
-            <button data-gender="male">남성</button>
-          </div>
-          <span class="section-label">연령대</span>
-          <div class="age-grid" id="ageFilter">
-            <button class="age-button active" data-age="all">전체</button>
-            <button class="age-button" data-age="평균">평균</button>
-            <button class="age-button" data-age="10대">10대</button>
-            <button class="age-button" data-age="20대">20대</button>
-            <button class="age-button" data-age="30대">30대</button>
-            <button class="age-button" data-age="40대">40대</button>
-            <button class="age-button" data-age="50대">50대</button>
-            <button class="age-button" data-age="60대">60대</button>
-            <button class="age-button" data-age="70대">70대</button>
-          </div>
-          <div class="filter-summary" id="filterSummary">전체 성별 · 전체 연령대가 표시되고 있습니다.</div>
-          <span class="section-label">화자 모음 모양</span>
-          <select class="speaker-select" id="speakerShapeSelect">
-            <option value="all">화자 선택</option>
-          </select>
-          <div class="filter-summary" id="speakerShapeSummary">화자를 선택하면 해당 화자의 모음 점을 순서대로 연결합니다.</div>
-        </section>
-
         <section class="panel mic-panel">
           <div class="panel-head">
             <div>
               <div class="panel-title">마이크 발음 분석</div>
-              <div class="panel-caption">표적 모음이 들어간 문장을 읽으면 내 발음의 위치를 분포도에 겹쳐 봅니다.</div>
+              <div class="panel-caption">선택한 모음만 발음하면 내 발음의 위치를 분포도에 겹쳐 봅니다.</div>
             </div>
           </div>
           <div class="field full">
@@ -348,94 +442,150 @@
               <option value="ㅜ">ㅜ (우)</option>
             </select>
           </div>
-          <div class="mic-prompt" id="micPrompt">나는 “이다”라고 말합니다.</div>
-          <div class="mic-status" id="micStatus">문장을 읽으면 먼저 큰따옴표 안 단어의 STT 전사를 확인합니다.</div>
-          <div class="mic-result" id="micResult">STT 전사가 정확하면 F1·F2 분석 결과를 그래프에 표시합니다.</div>
-          <div class="mic-actions">
-            <button class="submit-button" type="button" id="micStartBtn">마이크로 읽기</button>
-            <button class="secondary-button" type="button" id="micStopBtn" disabled>녹음 중지</button>
+          <div class="mic-prompt" id="micPrompt">ㅣ (이)를 길게 발음하세요.</div>
+          <div class="mic-status" id="micStatus">마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.</div>
+          <div class="mic-formant-readout" id="micFormantReadout" aria-live="polite">
+            <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
+            <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
           </div>
-          <div class="data-note">HTTPS 환경과 마이크 권한이 필요합니다. analysisApi 주소가 연결되면 Whisper와 Praat/Parselmouth 서버 분석을 사용하고, 연결되지 않으면 브라우저 기반 간이 F1·F2 예비 추정을 사용합니다.</div>
+          <div class="reference-zone-panel" id="referenceZonePanel">
+            <div class="reference-zone-head"><strong>관찰 범위</strong><span class="reference-zone-status" id="referenceZoneStatus">마이크 대기</span></div>
+            <div class="reference-zone-controls">
+              <label class="reference-zone-control"><input type="checkbox" id="referenceZoneToggle" checked />관찰 범위 표시</label>
+              <label class="reference-zone-control"><input type="checkbox" id="referenceZoneMaleToggle" checked /><span class="zone-swatch male-zone"></span>남성</label>
+              <label class="reference-zone-control"><input type="checkbox" id="referenceZoneFemaleToggle" checked /><span class="zone-swatch female-zone"></span>여성</label>
+            </div>
+            <div class="reference-zone-relation" id="micReferenceRelation">마이크 측정값과 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
+            <div class="reference-zone-note" id="referenceZoneNote">기준 평균 출처 사이의 시각화용 관찰 범위입니다. 자연발화와 단독 모음 조건이 다를 수 있으며, 정답·오류 판정이 아닙니다.</div>
+          </div>
+          <div class="mic-spectrum-panel">
+            <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
+            <canvas id="micSpectrum" width="620" height="170" aria-label="녹음 주파수 스펙트럼"></canvas>
+            <div class="mic-spectrum-note" id="micSpectrumNote">마이크를 켜면 실시간 스펙트럼과 서버 Praat/Parselmouth F1·F2가 표시됩니다.</div>
+          </div>
+
+          <div class="mic-actions continuous-mic-actions">
+            <button class="submit-button" type="button" id="micToggleBtn">마이크 켜기</button>
+            <span class="mic-live-indicator" id="micLiveIndicator" aria-live="polite">꺼짐</span>
+          </div>
+          <div class="data-note">마이크를 켜면 계속 듣습니다. 음성 구간을 약 1초마다 서버로 보내 Praat/Parselmouth F1·F2를 갱신하며, 일시정지하면 전송을 멈춥니다.</div>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">모음 값 일괄 추가</div>
-              <div class="panel-caption" id="pointFormCaption">한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.</div>
-            </div>
+        <section class="panel protected-panel">
+          <button class="panel-head panel-toggle" type="button" id="pointFormToggle" aria-expanded="false" aria-controls="pointFormBody">
+            <span class="panel-toggle-label">
+              <span class="panel-title">모음 값 일괄 추가</span>
+              <span class="panel-caption" id="pointFormCaption">새 모음값 입력</span>
+            </span>
+            <span class="panel-toggle-icon" id="pointFormToggleIcon" aria-hidden="true">＋</span>
+          </button>
+          <div class="panel-body" id="pointFormBody" hidden>
+            <form id="pointForm">
+              <div class="form-grid">
+                <div class="field" id="speakerIdField"><label for="speakerId">화자 ID</label><input id="speakerId" placeholder="예: K101" /></div>
+                <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
+                <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
+                <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
+                <div class="field full" id="averageReferenceField" hidden><label for="averageReference">평균값 참고 논문·자료</label><input id="averageReference" maxlength="180" placeholder="예: Yang (1992), JASA, Table 1, hVda" /></div>
+              </div>
+              <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
+              <div class="batch-input-grid" id="batchInputGrid"></div>
+              <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
+              <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
+              <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
+              <div class="data-note" id="inputRuleNote">같은 화자 ID의 같은 모음도 반복 입력할 수 있습니다. 입력할 때마다 별도의 반복 토큰으로 저장됩니다.</div>
+            </form>
           </div>
-          <form id="pointForm">
-            <div class="form-grid">
-              <div class="field" id="speakerIdField"><label for="speakerId">화자 ID</label><input id="speakerId" placeholder="예: K101" /></div>
-              <div class="field" id="regionField"><label for="region">지역</label><select id="region">
-                <option value="">지역을 선택하세요</option>
-                <option value="서울">서울</option>
-                <option value="경기">경기</option>
-                <option value="강원">강원</option>
-                <option value="충북">충북</option>
-                <option value="충남">충남</option>
-                <option value="전북">전북</option>
-                <option value="전남">전남</option>
-                <option value="경북">경북</option>
-                <option value="경남">경남</option>
-                <option value="제주">제주</option>
-                <option value="해외">해외</option>
-              </select></div>
-              <div class="field full" id="overseasCountryField" hidden><label for="overseasCountry">해외 국가</label><input id="overseasCountry" placeholder="예: 미국" /></div>
-              <div class="field" id="nationalityField"><label for="nationality">국적</label><input id="nationality" value="대한민국" placeholder="예: 대한민국" /></div>
-              <div class="field"><label for="gender">성별</label><select id="gender" required><option value="female">여성</option><option value="male">남성</option></select></div>
-              <div class="field"><label for="age">연령대</label><select id="age" required><option value="average">평균</option><option value="10대">10대</option><option value="20대" selected>20대</option><option value="30대">30대</option><option value="40대">40대</option><option value="50대">50대</option><option value="60대">60대</option><option value="70대">70대</option></select></div>
-            </div>
-            <div class="batch-input-heading"><span>모음별 F1·F2</span><small>단위: Hz</small></div>
-            <div class="batch-input-grid" id="batchInputGrid"></div>
-            <button class="submit-button" type="submit">입력한 모음값 한 번에 추가</button>
-            <button class="secondary-button" type="button" id="resetBtn">전체 데이터 삭제</button>
-            <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
-            <div class="data-note" id="inputRuleNote">같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.</div>
-          </form>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">데이터 삭제</div>
-              <div class="panel-caption">지정한 화자 전체 또는 특정 모음값을 삭제합니다.</div>
+        <section class="panel protected-panel">
+          <button class="panel-head panel-toggle" type="button" id="deletePanelToggle" aria-expanded="false" aria-controls="deletePanelBody">
+            <span class="panel-toggle-label">
+              <span class="panel-title">데이터 삭제</span>
+              <span class="panel-caption">저장된 모음값 관리</span>
+            </span>
+            <span class="panel-toggle-icon" id="deletePanelToggleIcon" aria-hidden="true">＋</span>
+          </button>
+          <div class="panel-body" id="deletePanelBody" hidden>
+            <div class="field full">
+              <label for="deleteSpeakerSelect">화자 전체 삭제</label>
+              <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
             </div>
+            <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
+            <div class="field full" style="margin-top:12px;">
+              <label for="deleteValueSelect">특정 토큰 삭제</label>
+              <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
+            </div>
+            <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 토큰 삭제</button>
+            <div class="field full" style="margin-top:12px;">
+              <label for="deleteAverageSelect">평균값 삭제</label>
+              <select class="speaker-select" id="deleteAverageSelect"><option value="">평균값을 선택하세요</option></select>
+            </div>
+            <button class="secondary-button danger-button" type="button" id="deleteAverageBtn">선택 평균값 삭제</button>
           </div>
-          <div class="field full">
-            <label for="deleteSpeakerSelect">화자 전체 삭제</label>
-            <select class="speaker-select" id="deleteSpeakerSelect"><option value="">화자를 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteSpeakerBtn">선택 화자 삭제</button>
-          <div class="field full" style="margin-top:12px;">
-            <label for="deleteValueSelect">특정 모음값 삭제</label>
-            <select class="speaker-select" id="deleteValueSelect"><option value="">값을 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteValueBtn">선택 값 삭제</button>
-          <div class="field full" style="margin-top:12px;">
-            <label for="deleteAverageSelect">평균값 삭제</label>
-            <select class="speaker-select" id="deleteAverageSelect"><option value="">평균값을 선택하세요</option></select>
-          </div>
-          <button class="secondary-button danger-button" type="button" id="deleteAverageBtn">선택 평균값 삭제</button>
         </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">현재 데이터 요약</div>
-              <div class="panel-caption">필터 적용 전 전체 데이터 기준</div>
-            </div>
-          </div>
-          <div class="mini-stats">
-            <div class="mini-stat"><strong id="speakerCount">0</strong><span>화자</span></div>
-            <div class="mini-stat"><strong id="vowelCount">0</strong><span>모음</span></div>
-            <div class="mini-stat"><strong id="recordCount">0</strong><span>토큰</span></div>
-            <div class="mini-stat"><strong id="averageCount">0</strong><span>평균값</span></div>
-          </div>
-        </section>
       </aside>
     </main>
+  </div>
+
+  <div class="filter-backdrop hidden" id="filterModal" role="dialog" aria-modal="true" aria-labelledby="filterModalTitle">
+    <div class="filter-dialog">
+      <div class="filter-dialog-head">
+        <div>
+          <div class="panel-title" id="filterModalTitle">분포 필터</div>
+          <div class="panel-caption">보기 방식과 성별·연령대·평균 출처를 선택합니다.</div>
+        </div>
+        <button class="filter-dialog-close" type="button" id="filterCloseBtn" aria-label="분포 필터 닫기">×</button>
+      </div>
+      <div class="filter-dialog-body">
+        <span class="section-label">보기 방식</span>
+        <div class="view-mode-group" id="viewModeFilter">
+          <button class="view-mode-button active" data-view="overview">전체 분포</button>
+          <button class="view-mode-button" data-view="speaker">화자 삼각도</button>
+          <button class="view-mode-button" data-view="vowel">특정 모음값</button>
+        </div>
+        <span class="section-label">성별</span>
+        <div class="segmented" id="genderFilter">
+          <button class="active" data-gender="all">전체</button>
+          <button data-gender="female">여성</button>
+          <button data-gender="male">남성</button>
+        </div>
+        <span class="section-label">연령대</span>
+        <div class="age-grid" id="ageFilter">
+          <button class="age-button active" data-age="all">전체</button>
+          <button class="age-button" data-age="평균">평균</button>
+          <button class="age-button" data-age="10대">10대</button>
+          <button class="age-button" data-age="20대">20대</button>
+          <button class="age-button" data-age="30대">30대</button>
+          <button class="age-button" data-age="40대">40대</button>
+          <button class="age-button" data-age="50대">50대</button>
+          <button class="age-button" data-age="60대">60대</button>
+          <button class="age-button" data-age="70대">70대</button>
+        </div>
+        <span class="section-label" id="averageSeriesLabel">평균값 출처</span>
+        <select class="speaker-select" id="averageSeriesSelect">
+          <option value="all">모든 평균 출처</option>
+        </select>
+        <span class="section-label" id="speakerShapeLabel" hidden>화자 삼각도 화자</span>
+        <select class="speaker-select" id="speakerShapeSelect" hidden>
+          <option value="all">화자 선택</option>
+        </select>
+        <span class="section-label" id="vowelFilterLabel" hidden>특정 모음(복수 선택)</span>
+        <div class="vowel-filter-grid" id="vowelFilter" hidden>
+          <button class="vowel-filter-button active" data-vowel="all">전체</button>
+          <button class="vowel-filter-button" data-vowel="ㅣ">ㅣ</button>
+          <button class="vowel-filter-button" data-vowel="ㅔ">ㅔ</button>
+          <button class="vowel-filter-button" data-vowel="ㅐ">ㅐ</button>
+          <button class="vowel-filter-button" data-vowel="ㅏ">ㅏ</button>
+          <button class="vowel-filter-button" data-vowel="ㅓ">ㅓ</button>
+          <button class="vowel-filter-button" data-vowel="ㅡ">ㅡ</button>
+          <button class="vowel-filter-button" data-vowel="ㅗ">ㅗ</button>
+          <button class="vowel-filter-button" data-vowel="ㅜ">ㅜ</button>
+        </div>
+        <div class="filter-summary" id="speakerShapeSummary">전체 분포에서는 화자 연결선을 표시하지 않습니다.</div>
+      </div>
+    </div>
   </div>
 
   <div class="confirm-backdrop hidden" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
@@ -452,61 +602,98 @@
     </div>
   </div>
 
+  <div class="confirm-backdrop hidden" id="panelPasswordModal" role="dialog" aria-modal="true" aria-labelledby="panelPasswordTitle">
+    <div class="confirm-dialog">
+      <div class="confirm-title" id="panelPasswordTitle">관리자 확인</div>
+      <div class="confirm-description">새 모음값 입력과 데이터 삭제 기능을 열려면 비밀번호를 입력하세요.</div>
+      <label class="confirm-label" for="panelPasswordInput">비밀번호</label>
+      <input class="confirm-input" id="panelPasswordInput" type="password" autocomplete="current-password" spellcheck="false" />
+      <div class="confirm-message" id="panelPasswordMessage">비밀번호를 입력하면 해당 패널이 열립니다.</div>
+      <div class="confirm-actions">
+        <button class="secondary-button" type="button" id="panelPasswordCancel">취소</button>
+        <button class="submit-button" type="button" id="panelPasswordSubmit">확인</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const VOWELS = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅡ','ㅗ','ㅜ'];
     const VOWEL_TRIANGLE_ORDER = ['ㅣ','ㅔ','ㅐ','ㅏ','ㅓ','ㅗ','ㅜ','ㅡ'];
     const VOWEL_SYLLABLES = { 'ㅣ':'이', 'ㅔ':'에', 'ㅐ':'애', 'ㅏ':'아', 'ㅓ':'어', 'ㅡ':'으', 'ㅗ':'오', 'ㅜ':'우' };
-    const VOWEL_CARRIER_SENTENCES = {
-      'ㅣ': '나는 “이다”라고 말합니다.',
-      'ㅔ': '나는 “에다”라고 말합니다.',
-      'ㅐ': '나는 “애다”라고 말합니다.',
-      'ㅏ': '나는 “아다”라고 말합니다.',
-      'ㅓ': '나는 “어다”라고 말합니다.',
-      'ㅡ': '나는 “으다”라고 말합니다.',
-      'ㅗ': '나는 “오다”라고 말합니다.',
-      'ㅜ': '나는 “우다”라고 말합니다.'
-    };
-    const VOWEL_STT_TARGETS = { 'ㅣ':'이다', 'ㅔ':'에다', 'ㅐ':'애다', 'ㅏ':'아다', 'ㅓ':'어다', 'ㅡ':'으다', 'ㅗ':'오다', 'ㅜ':'우다' };
-    const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || '';
+    const FORMANT_API_URL = new URLSearchParams(location.search).get('analysisApi') || 'https://korean-vowel-formant-api.onrender.com';
+    const SHARED_DATA_API_URL = new URLSearchParams(location.search).get('sharedApi') || FORMANT_API_URL;
     const AGE_GROUPS = ['평균','10대','20대','30대','40대','50대','60대','70대'];
     const STORAGE_KEY = 'vowel-space-prototype-v2-empty';
     const AVERAGE_STORAGE_KEY = 'vowel-space-prototype-v2-averages';
+    const DEFAULT_AVERAGE_SERIES = [
+      { id: 'default-yang-1992-male', reference: 'Yang(1992)', gender: 'male', values: [[341, 2219], [490, 1968], [591, 1849], [738, 1372], [608, 1121], [405, 1488], [453, 945], [369, 981]] },
+      { id: 'default-yang-1992-female', reference: 'Yang(1992)', gender: 'female', values: [[344, 2814], [650, 2377], [677, 2285], [986, 1794], [765, 1371], [447, 1703], [499, 1029], [422, 1021]] },
+      { id: 'default-yoon-kang-2014-male', reference: '윤태진·강윤정(2014)', gender: 'male', values: [[325, 1960], [448, 1739], [444, 1717], [638, 1333], [486, 1100], [374, 1381], [412, 984], [333, 1066]] },
+      { id: 'default-yoon-kang-2014-female', reference: '윤태진·강윤정(2014)', gender: 'female', values: [[360, 2442], [500, 2168], [480, 2173], [825, 1688], [595, 1286], [410, 1706], [450, 1103], [357, 1203]] }
+    ];
+    function buildDefaultAverageData() {
+      return DEFAULT_AVERAGE_SERIES.flatMap(series => VOWELS.map((vowel, index) => ({
+        id: series.id + '-' + vowel,
+        age: '평균',
+        gender: series.gender,
+        vowel,
+        f1: series.values[index][0],
+        f2: series.values[index][1],
+        averageReference: series.reference,
+        averageSeriesId: series.id,
+        source: 'average'
+      })));
+    }
     let data = loadData();
     let averageData = loadAverageData();
     let selectedGender = 'all';
     let selectedAge = 'all';
     let selectedSpeaker = 'all';
-    let selectedVowel = 'all';
+    let selectedVowels = [];
+    let selectedView = 'overview';
+    let selectedRepetition = 'all';
+    let pointSelectionReturnState = null;
     let selectedAverageSeries = 'all';
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
     let micPoint = null;
+    let referenceZoneVisible = true;
+    let referenceZoneMaleVisible = true;
+    let referenceZoneFemaleVisible = true;
     let micStream = null;
     let micAudioContext = null;
     let micAnalyser = null;
     let micAnimationFrame = null;
     let micSpectrumFrames = [];
+    let micActivityLevels = [];
     let micLastSampleAt = 0;
-    let micRecorder = null;
-    let micChunks = [];
-    let micRecordingPromise = null;
-    let micRecognition = null;
-    let micRecognitionEnded = true;
-    let micRecognitionCandidates = [];
-    let micRecognitionFinalCandidates = [];
-    let micRecognitionTranscript = '';
-    let micRecognitionFinalTranscript = '';
-    let micRecognitionSegments = [];
-    let micRecognitionError = '';
-    let micRecognitionRestartCount = 0;
-    let micFinishTimer = null;
-    let micStopRequested = false;
-    let micAnalysisSnapshot = null;
+    let micSpectrumSnapshot = null;
+    let micServerFormants = null;
+    let micCaptureProcessor = null;
+    let micPcmChunks = [];
+    let micPcmSampleCount = 0;
+    let micPcmSampleRate = 0;
+    let micContinuousTimer = null;
+    let micServerBusy = false;
+    let micContinuousGeneration = 0;
+    let micLastLiveError = "";
     let pendingDeletion = null;
+    let pendingProtectedPanel = null;
+    let protectedPanelSessionPassword = '';
+    let sharedDataError = '';
+    let sharedDataState = 'loading';
+    let sharedRecordIds = new Set();
+    const PROTECTED_PANEL_PASSWORD_HASH = 'bc89bdbb880e891b152199ab67b2f8d930875469bc74f0c07e2e3dcd978845df';
 
     const svg = document.getElementById('chart');
     const plotContent = document.getElementById('plotContent');
     const chartWrap = document.getElementById('chartWrap');
+    const micSpectrumCanvas = document.getElementById('micSpectrum');
+    const micSpectrumNote = document.getElementById('micSpectrumNote');
+    const micF1Value = document.getElementById('micF1Value');
+    const micF2Value = document.getElementById('micF2Value');
+    const micToggleBtn = document.getElementById('micToggleBtn');
+    const micLiveIndicator = document.getElementById('micLiveIndicator');
     const tooltip = document.getElementById('tooltip');
     const plot = { x: 78, y: 32, w: 748, h: 520 };
     const domain = { f2Min: 0, f2Max: 3000, f1Min: 0, f1Max: 1000 };
@@ -514,30 +701,91 @@
     const MAX_ZOOM = 4;
     let viewDomain = { ...domain };
 
-    function normalizeData(records) {
-      const unique = new Map();
-      records.forEach(item => {
-        if (!item || !item.speakerId || !item.vowel) return;
-        const key = `${item.speakerId}::${item.vowel}`;
-        if (!unique.has(key)) unique.set(key, item);
+    const SPEAKER_ID_RENAMES = { 'K_2009_001': 'K_001' };
+    const SPEAKER_SWAP_MIGRATION_KEY = 'vowel-space-prototype-v2-speaker-swap-k001-k002';
+    function renameSpeakerRecord(item) {
+      if (!item || typeof item !== 'object') return item;
+      const oldSpeakerId = String(item.speakerId || '');
+      const newSpeakerId = SPEAKER_ID_RENAMES[oldSpeakerId] || oldSpeakerId;
+      const oldId = String(item.id || '');
+      const newId = newSpeakerId !== oldSpeakerId && oldId.startsWith(oldSpeakerId + '-')
+        ? newSpeakerId + oldId.slice(oldSpeakerId.length)
+        : oldId;
+      return { ...item, speakerId: newSpeakerId, ...(newId ? { id: newId } : {}) };
+    }
+    function swapSpeakerPairRecords(records) {
+      return (Array.isArray(records) ? records : []).map(item => {
+        if (!item || typeof item !== 'object') return item;
+        const oldSpeakerId = String(item.speakerId || '');
+        const newSpeakerId = oldSpeakerId === 'K_001' ? 'K_002' : oldSpeakerId === 'K_002' ? 'K_001' : oldSpeakerId;
+        const oldId = String(item.id || '');
+        const newId = newSpeakerId !== oldSpeakerId && oldId.startsWith(oldSpeakerId + '-')
+          ? newSpeakerId + oldId.slice(oldSpeakerId.length)
+          : oldId;
+        return { ...item, speakerId: newSpeakerId, ...(newId ? { id: newId } : {}) };
       });
-      return [...unique.values()];
+    }
+    function normalizeData(records) {
+      const usedIds = new Set();
+      const counters = new Map();
+      const normalized = [];
+      (Array.isArray(records) ? records : []).forEach(item => {
+        const record = renameSpeakerRecord(item);
+        if (!record || !record.speakerId || !record.vowel) return;
+        const key = record.speakerId + '::' + record.vowel;
+        let tokenNo = (counters.get(key) || 0) + 1;
+        while (tokenNo <= (counters.get(key) || 0)) tokenNo += 1;
+        counters.set(key, tokenNo);
+        const baseId = record.id || record.speakerId + '-' + record.vowel + '-' + tokenNo;
+        let id = baseId;
+        let suffix = 2;
+        while (usedIds.has(id)) id = baseId + '-' + suffix++;
+        usedIds.add(id);
+        normalized.push({ ...record, id, tokenNo });
+      });
+      return normalized;
+    }
+    function nextTokenNumber(speakerId, vowel) {
+      return data.filter(item => item.speakerId === speakerId && item.vowel === vowel).reduce((max, item) => Math.max(max, Number(item.tokenNo) || 0), 0) + 1;
     }
     function normalizeAverageData(records) {
-      const unique = new Map();
-      records.forEach(item => {
-        if (!item || !item.age || !item.gender || !item.vowel) return;
-        const key = `${item.age}::${item.gender}::${item.vowel}`;
-        if (!unique.has(key)) unique.set(key, { ...item, source: 'average', id: item.id || `average-${item.age}-${item.gender}-${item.vowel}` });
+      const usedIds = new Set();
+      const legacySeriesIds = new Map();
+      return (Array.isArray(records) ? records : []).flatMap((item, index) => {
+        if (!item || !item.age || !item.gender || !item.vowel) return [];
+        const age = item.age === 'average' ? '평균' : item.age;
+        const reference = String(item.averageReference || item.reference || item.sourceLabel || '').trim() || '기존 평균값';
+        const legacyKey = age + '::' + item.gender;
+        const seriesId = String(item.averageSeriesId || item.seriesId || legacySeriesIds.get(legacyKey) || ('average-series-' + age + '-' + item.gender + '-legacy'));
+        legacySeriesIds.set(legacyKey, seriesId);
+        const baseId = String(item.id || (seriesId + '-' + item.vowel + '-' + index));
+        let id = baseId;
+        let suffix = 2;
+        while (usedIds.has(id)) id = baseId + '-' + suffix++;
+        usedIds.add(id);
+        return [{
+          ...item,
+          id,
+          age,
+          gender: item.gender,
+          vowel: item.vowel,
+          averageReference: reference,
+          averageSeriesId: seriesId,
+          source: 'average'
+        }];
       });
-      return [...unique.values()];
     }
     function loadAverageData() {
+      if (!localStorage.getItem(AVERAGE_STORAGE_KEY)) {
+        const defaults = normalizeAverageData(buildDefaultAverageData());
+        try { localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(defaults)); } catch (e) {}
+        return defaults;
+      }
       try {
         const saved = JSON.parse(localStorage.getItem(AVERAGE_STORAGE_KEY));
         if (Array.isArray(saved)) {
           const normalized = normalizeAverageData(saved);
-          if (normalized.length !== saved.length) localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(normalized));
+          if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(AVERAGE_STORAGE_KEY, JSON.stringify(normalized));
           return normalized;
         }
       } catch (e) {}
@@ -551,10 +799,14 @@
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (Array.isArray(saved)) {
-          const normalized = normalizeData(saved);
-          if (normalized.length !== saved.length) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          const shouldSwapSpeakerPair = !localStorage.getItem(SPEAKER_SWAP_MIGRATION_KEY);
+          const migrated = shouldSwapSpeakerPair ? swapSpeakerPairRecords(saved) : saved;
+          const normalized = normalizeData(migrated);
+          if (JSON.stringify(normalized) !== JSON.stringify(saved)) localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          if (shouldSwapSpeakerPair) localStorage.setItem(SPEAKER_SWAP_MIGRATION_KEY, 'done');
           return normalized;
         }
+        localStorage.setItem(SPEAKER_SWAP_MIGRATION_KEY, 'done');
       } catch (e) {}
       return [];
     }
@@ -651,7 +903,7 @@
         axisHtml += `<text class="tick-label" x="${plot.x-10}" y="${y+4}" text-anchor="end">${tick} Hz</text>`;
       });
       document.getElementById('axisTicks').innerHTML = axisHtml;
-      plotContent.innerHTML = `<g class="grid">${gridHtml}</g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
+      plotContent.innerHTML = `<g class="grid">${gridHtml}</g><g id="referenceZoneLayer"></g><g id="speakerLineLayer"></g><g id="pointsLayer"></g>`;
     }
 
     function isLegacyAverageSpeaker(d) {
@@ -667,161 +919,312 @@
       const explicitKeys = new Set(explicit.map(averageEntryKey));
       const legacy = data
         .filter(isLegacyAverageSpeaker)
-        .map(d => ({ ...d, age: '평균', source: 'average' }))
+        .map(d => ({
+          ...d,
+          age: '평균',
+          source: 'average',
+          averageReference: d.averageReference || d.reference || '기존 평균값',
+          averageSeriesId: d.averageSeriesId || ('legacy-speaker-average-' + d.gender)
+        }))
         .filter(d => !explicitKeys.has(averageEntryKey(d)));
       return [...explicit, ...legacy];
+    }
+    function getReferenceZone(vowel, gender) {
+      const values = averageDisplayData()
+        .filter(item => item.vowel === vowel && item.gender === gender)
+        .map(item => ({ f1: Number(item.f1), f2: Number(item.f2) }))
+        .filter(item => Number.isFinite(item.f1) && Number.isFinite(item.f2));
+      if (!values.length) return null;
+      const f1Values = values.map(item => item.f1);
+      const f2Values = values.map(item => item.f2);
+      const f1Min = Math.max(domain.f1Min, Math.min(...f1Values) - Math.max(55, (Math.max(...f1Values) - Math.min(...f1Values)) * .5));
+      const f1Max = Math.min(domain.f1Max, Math.max(...f1Values) + Math.max(55, (Math.max(...f1Values) - Math.min(...f1Values)) * .5));
+      const f2Min = Math.max(domain.f2Min, Math.min(...f2Values) - Math.max(100, (Math.max(...f2Values) - Math.min(...f2Values)) * .5));
+      const f2Max = Math.min(domain.f2Max, Math.max(...f2Values) + Math.max(100, (Math.max(...f2Values) - Math.min(...f2Values)) * .5));
+      return { gender, vowel, f1Min, f1Max, f2Min, f2Max, centerF1: f1Values.reduce((sum, value) => sum + value, 0) / f1Values.length, centerF2: f2Values.reduce((sum, value) => sum + value, 0) / f2Values.length };
+    }
+    function referenceZoneRect(zone) {
+      const x1 = xScale(zone.f2Max);
+      const x2 = xScale(zone.f2Min);
+      const y1 = yScale(zone.f1Min);
+      const y2 = yScale(zone.f1Max);
+      return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1), centerX: xScale(zone.centerF2), centerY: yScale(zone.centerF1) };
+    }
+    function closestPointOnRect(px, py, rect) {
+      const inside = px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
+      if (!inside) return { x: Math.max(rect.x, Math.min(rect.x + rect.width, px)), y: Math.max(rect.y, Math.min(rect.y + rect.height, py)) };
+      const candidates = [
+        { x: rect.x, y: py },
+        { x: rect.x + rect.width, y: py },
+        { x: px, y: rect.y },
+        { x: px, y: rect.y + rect.height }
+      ];
+      return candidates.sort((a, b) => ((a.x - px) ** 2 + (a.y - py) ** 2) - ((b.x - px) ** 2 + (b.y - py) ** 2))[0];
+    }
+    function syncReferenceZoneControls() {
+      const active = Boolean(micStream || micPoint);
+      const status = document.getElementById('referenceZoneStatus');
+      const relation = document.getElementById('micReferenceRelation');
+      const master = document.getElementById('referenceZoneToggle');
+      const male = document.getElementById('referenceZoneMaleToggle');
+      const female = document.getElementById('referenceZoneFemaleToggle');
+      if (master) master.checked = referenceZoneVisible;
+      if (male) male.checked = referenceZoneMaleVisible;
+      if (female) female.checked = referenceZoneFemaleVisible;
+      if (status) status.textContent = active ? '측정값 표시 중' : '마이크 대기';
+      if (relation) {
+        relation.textContent = !referenceZoneVisible
+          ? '관찰 범위 표시가 꺼져 있습니다.'
+          : active
+            ? '현재 측정값과 각 관찰 범위의 위치 관계를 차트의 점선으로 표시합니다.'
+            : '마이크 측정값이 생기면 관찰 범위와의 위치 관계를 차트에 표시합니다.';
+      }
+    }
+    function drawReferenceZones() {
+      const layer = document.getElementById('referenceZoneLayer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      const vowel = document.getElementById('micVowel')?.value;
+      if (!referenceZoneVisible || !(micStream || micPoint) || !vowel) return;
+      const zones = [];
+      if (referenceZoneMaleVisible) {
+        const zone = getReferenceZone(vowel, 'male');
+        if (zone) zones.push(zone);
+      }
+      if (referenceZoneFemaleVisible) {
+        const zone = getReferenceZone(vowel, 'female');
+        if (zone) zones.push(zone);
+      }
+      if (!zones.length) return;
+      const micReady = micPoint && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)) && micPoint.vowel === vowel;
+      const micX = micReady ? xScale(Number(micPoint.f2)) : null;
+      const micY = micReady ? yScale(Number(micPoint.f1)) : null;
+      const markup = zones.map(zone => {
+        const rect = referenceZoneRect(zone);
+        const className = zone.gender === 'male' ? 'male-zone' : 'female-zone';
+        const label = zone.gender === 'male' ? '남성 관찰 범위' : '여성 관찰 범위';
+        const lineTarget = micReady ? closestPointOnRect(micX, micY, rect) : null;
+        const line = lineTarget && (Math.abs(lineTarget.x - micX) > 1 || Math.abs(lineTarget.y - micY) > 1)
+          ? '<line class="reference-zone-distance ' + className + '" x1="' + micX + '" y1="' + micY + '" x2="' + lineTarget.x + '" y2="' + lineTarget.y + '" />'
+          : '';
+        const targetDot = lineTarget ? '<circle class="reference-zone-distance-dot ' + className + '" cx="' + lineTarget.x + '" cy="' + lineTarget.y + '" r="3" />' : '';
+        return '<rect class="reference-zone ' + className + '" x="' + rect.x + '" y="' + rect.y + '" width="' + rect.width + '" height="' + rect.height + '" rx="14" aria-label="' + label + '" />' + line + targetDot + '<text class="reference-zone-label ' + className + '" x="' + (rect.x + 8) + '" y="' + (rect.y + 16) + '">' + label + '</text>';
+      }).join('');
+      layer.innerHTML = markup;
     }
     function matchesSelectedAge(d) {
       if (selectedAge === 'all') return true;
       if (selectedAge === 'average') return d.age === '평균' || d.age === 'average' || isLegacyAverageSpeaker(d);
       return d.age === selectedAge;
     }
+    function hasSelectedVowels() {
+      return selectedVowels.length > 0;
+    }
+    function isVowelSelected(vowel) {
+      return selectedVowels.includes(vowel);
+    }
+    function selectedVowelLabel() {
+      return selectedVowels.length ? selectedVowels.join(', ') : '모음 선택';
+    }
     function filteredData() {
       return data.filter(d => !isLegacyAverageSpeaker(d) && (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
     }
     function filteredAverageData() {
-      return averageDisplayData().filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d));
+      return averageDisplayData().filter(d => (selectedGender === 'all' || d.gender === selectedGender) && matchesSelectedAge(d) && (selectedAverageSeries === 'all' || averageSeriesKey(d) === selectedAverageSeries));
     }
     function refreshDataSelectors() {
-      const allSpeakers = [...new Set(data.map(d => d.speakerId))].sort();
-      const visibleSpeakers = [...new Set(filteredData().map(d => d.speakerId))].sort();
+      const allSpeakers = [...new Set(data.filter(d => !isLegacyAverageSpeaker(d)).map(d => d.speakerId))].sort();
+      const visibleSpeakers = allSpeakers;
       if (selectedSpeaker !== 'all' && !visibleSpeakers.includes(selectedSpeaker)) selectedSpeaker = 'all';
       const shapeSelect = document.getElementById('speakerShapeSelect');
-      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + visibleSpeakers.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+      shapeSelect.innerHTML = '<option value="all">화자 선택</option>' + visibleSpeakers.map(id => '<option value="' + esc(id) + '">' + esc(id) + '</option>').join('');
       shapeSelect.value = selectedSpeaker;
       const deleteSpeaker = document.getElementById('deleteSpeakerSelect');
-      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => `<option value="${esc(id)}">${esc(id)} (${data.filter(d => d.speakerId === id).length}개)</option>`).join('');
+      deleteSpeaker.innerHTML = '<option value="">화자를 선택하세요</option>' + allSpeakers.map(id => '<option value="' + esc(id) + '">' + esc(id) + ' (' + data.filter(d => d.speakerId === id).length + '개)</option>').join('');
       const deleteValue = document.getElementById('deleteValueSelect');
-      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => `<option value="${esc(d.id)}">${esc(d.speakerId)} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2} · ${esc(d.nationality || '미입력')} · ${esc(locationLabel(d))}</option>`).join('');
+      deleteValue.innerHTML = '<option value="">값을 선택하세요</option>' + data.map(d => '<option value="' + esc(d.id) + '">' + esc(d.speakerId) + ' · ' + esc(d.vowel) + ' · ' + (d.tokenNo || 1) + '회 · F1 ' + d.f1 + ' / F2 ' + d.f2 + ' · ' + esc(d.nationality || '미입력') + (d.region || d.country ? ' · ' + esc(locationLabel(d)) : '') + '</option>').join('');
       const deleteAverage = document.getElementById('deleteAverageSelect');
-      deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => `<option value="${esc(d.id)}">${esc(d.age)} · ${d.gender === 'female' ? '여성' : '남성'} · ${esc(d.vowel)} · F1 ${d.f1} / F2 ${d.f2}</option>`).join('');
+      deleteAverage.innerHTML = '<option value="">평균값을 선택하세요</option>' + averageData.map(d => '<option value="' + esc(d.id) + '">' + esc(d.age) + ' · ' + (d.gender === 'female' ? '여성' : '남성') + ' · ' + esc(d.vowel) + ' · ' + esc(d.averageReference || '기존 평균값') + ' · F1 ' + d.f1 + ' / F2 ' + d.f2 + '</option>').join('');
+      const averageSeriesSelect = document.getElementById('averageSeriesSelect');
+      if (averageSeriesSelect) {
+        const seriesExamples = new Map();
+        averageDisplayData().forEach(d => { const key = averageSeriesKey(d); if (!seriesExamples.has(key)) seriesExamples.set(key, d); });
+        if (selectedAverageSeries !== 'all' && !seriesExamples.has(selectedAverageSeries)) selectedAverageSeries = 'all';
+        averageSeriesSelect.innerHTML = '<option value="all">모든 평균 출처</option>' + [...seriesExamples.entries()].map(([key, d]) => '<option value="' + esc(key) + '">' + esc(averageSeriesLabel(d)) + '</option>').join('');
+        averageSeriesSelect.value = selectedAverageSeries;
+      }
     }
     function averageSeriesKey(d) {
-      return `${d.age}|${d.gender}`;
+      return String(d.averageSeriesId || ('average-series-' + (d.age || '평균') + '-' + (d.gender || 'unknown') + '-' + (d.averageReference || '기존 평균값')));
     }
     function averageSeriesLabel(d) {
       const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
-      return d.age === '평균' ? `${genderLabel} 평균` : `${d.age} ${genderLabel} 평균`;
+      const ageLabel = d.age === '평균' ? '' : d.age + ' ';
+      const reference = d.averageReference || '기존 평균값';
+      return ageLabel + genderLabel + ' 평균 · ' + reference;
     }
+    function collapseVowelTokens(items) {
+      const groups = new Map();
+      items.forEach(item => {
+        if (!groups.has(item.vowel)) groups.set(item.vowel, []);
+        groups.get(item.vowel).push(item);
+      });
+      return [...groups.values()].map(group => {
+        const first = group[0];
+        return {
+          ...first,
+          f1: group.reduce((sum, item) => sum + Number(item.f1), 0) / group.length,
+          f2: group.reduce((sum, item) => sum + Number(item.f2), 0) / group.length,
+          tokenCount: group.length
+        };
+      });
+    }
+
     function drawSpeakerShape() {
       const lineLayer = document.getElementById('speakerLineLayer');
       const summary = document.getElementById('speakerShapeSummary');
       if (!lineLayer) return;
-      const makeShape = (items, label) => {
-        const points = items.map(d => String(xScale(d.f2)) + ',' + String(yScale(d.f1))).join(' ');
-        const nodes = items.map(d => '<text class="speaker-node" x="' + xScale(d.f2) + '" y="' + yScale(d.f1) + '" aria-label="' + esc(d.vowel) + '">' + esc(d.vowel) + '</text>').join('');
-        const closesTriangle = items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ');
+      lineLayer.innerHTML = '';
+      if (selectedView !== 'speaker' || selectedSpeaker === 'all') {
+        if (summary) summary.textContent = selectedView === 'speaker'
+          ? '화자 삼각도 보기에서 화자를 선택하면 회차별 연결선을 표시합니다.'
+          : '전체 분포와 특정 모음값 보기에서는 화자 연결선을 표시하지 않습니다.';
+        return;
+      }
+      const records = filteredData().filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel));
+      const groups = new Map();
+      records.forEach(item => {
+        const repetition = Number(item.tokenNo) || 1;
+        if (!groups.has(repetition)) groups.set(repetition, []);
+        groups.get(repetition).push(item);
+      });
+      const makeShape = (items, repetition) => {
+        const ordered = [...items].sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
+        if (!ordered.length) return '';
+        const points = ordered.map(item => String(xScale(item.f2)) + ',' + String(yScale(item.f1))).join(' ');
+        const closesTriangle = ordered.length >= 3 && ordered.some(item => item.vowel === 'ㅣ') && ordered.some(item => item.vowel === 'ㅡ');
         const shapeTag = closesTriangle ? 'polygon' : 'polyline';
-        const closeNotice = closesTriangle ? ' ㅡ-ㅣ 선으로 닫힌 모음 삼각도입니다.' : ' ㅡ 입력 전에는 열린 순서선으로 표시합니다.';
-        const shapeColorClass = items[0].gender === 'female' ? ' female-shape' : items[0].gender === 'male' ? ' male-shape' : '';
-        const markup = '<' + shapeTag + ' class="speaker-path' + shapeColorClass + '" points="' + points + '" />' + nodes + '<text class="speaker-label" x="' + (xScale(items[0].f2) + 10) + '" y="' + (yScale(items[0].f1) - 10) + '">' + esc(label) + '</text>';
-        return { markup, count: items.length, closeNotice };
+        const repetitionClass = repetition === 1 ? ' repetition-1' : repetition === 2 ? ' repetition-2' : repetition === 3 ? ' repetition-3' : '';
+        const focusClass = selectedRepetition === 'all' || Number(selectedRepetition) === repetition ? '' : ' repetition-muted';
+        const path = ordered.length >= 2 ? '<' + shapeTag + ' class="speaker-path' + repetitionClass + focusClass + '" points="' + points + '" />' : '';
+        const nodes = ordered.map(item => '<text class="speaker-node' + focusClass + '" x="' + xScale(item.f2) + '" y="' + yScale(item.f1) + '" aria-label="' + esc(item.vowel + ' ' + repetition + '회') + '">' + esc(item.vowel) + '</text>').join('');
+        const label = '<text class="speaker-label' + focusClass + '" x="' + (xScale(ordered[0].f2) + 10) + '" y="' + (yScale(ordered[0].f1) - 10) + '">' + repetition + '회</text>';
+        return path + nodes + label;
       };
-      let shapeData = [];
-      let shapeLabel = '';
-      if (selectedAverageSeries !== 'all') {
-        shapeData = averageDisplayData()
-          .filter(d => averageSeriesKey(d) === selectedAverageSeries && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
-        shapeLabel = shapeData.length ? averageSeriesLabel(shapeData[0]) : '선택한 평균';
-      } else if (selectedSpeaker !== 'all') {
-        shapeData = filteredData()
-          .filter(d => d.speakerId === selectedSpeaker && VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-          .sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel));
-        shapeLabel = selectedSpeaker;
-      } else if ((selectedAge === '평균' || selectedAge === 'average') && selectedGender === 'all') {
-        const grouped = new Map();
-        filteredAverageData()
-          .filter(d => VOWEL_TRIANGLE_ORDER.includes(d.vowel))
-          .forEach(d => {
-            const key = averageSeriesKey(d);
-            if (!grouped.has(key)) grouped.set(key, []);
-            grouped.get(key).push(d);
-          });
-        const genderOrder = { male: 0, female: 1 };
-        const groups = [...grouped.values()]
-          .map(items => items.sort((a, b) => VOWEL_TRIANGLE_ORDER.indexOf(a.vowel) - VOWEL_TRIANGLE_ORDER.indexOf(b.vowel)))
-          .filter(items => items.length >= 2)
-          .sort((a, b) => (genderOrder[a[0].gender] ?? 9) - (genderOrder[b[0].gender] ?? 9));
-        if (!groups.length) {
-          lineLayer.innerHTML = '';
-          summary.textContent = '남성·여성 평균의 모음값이 2개 이상 입력되면 두 모음 모양을 함께 표시합니다.';
-          return;
-        }
-        const renderedGroups = groups.map(items => makeShape(items, averageSeriesLabel(items[0])));
-        lineLayer.innerHTML = renderedGroups.map(item => item.markup).join('');
-        const labels = groups.map(items => averageSeriesLabel(items[0])).join(' · ');
-        const closeNotice = groups.every(items => items.some(d => d.vowel === 'ㅣ') && items.some(d => d.vowel === 'ㅡ'))
-          ? ' ㅡ-ㅣ 선으로 각각 닫힌 모음 삼각도입니다.'
-          : ' 일부 평균은 ㅡ 입력 전까지 열린 순서선으로 표시됩니다.';
-        summary.textContent = labels + ': 각 평균의 전체 모음값을 동시에 연결합니다.' + closeNotice;
-        return;
+      const repetitions = [...groups.keys()].sort((a, b) => a - b);
+      lineLayer.innerHTML = repetitions.map(repetition => makeShape(groups.get(repetition), repetition)).join('');
+      if (summary) {
+        const labels = repetitions.map(repetition => repetition + '회').join(' · ');
+        summary.textContent = selectedSpeaker + ': ' + (labels || '입력된 모음 없음') + ' 값을 각각 연결합니다. 같은 회차의 모음만 연결하며, ㅣ와 ㅡ가 모두 있으면 선을 닫습니다.';
       }
-      if (shapeData.length < 2) {
-        lineLayer.innerHTML = '';
-        summary.textContent = selectedAverageSeries !== 'all' || selectedSpeaker !== 'all'
-          ? (shapeLabel + ': 모음 삼각도 선을 만들려면 해당 순서의 모음값이 2개 이상 필요합니다.')
-          : '화자 선택 메뉴에서 화자의 모음 모양을 선택합니다. 분포도 점을 클릭하면 같은 모음의 남녀 결과를 강조하고 클릭한 화자 또는 평균 집단의 모음 모양을 연결합니다.';
-        return;
-      }
-      const rendered = makeShape(shapeData, shapeLabel);
-      lineLayer.innerHTML = rendered.markup;
-      summary.textContent = shapeLabel + ': ' + rendered.count + '개 모음을 ㅣ-ㅔ-ㅐ-ㅏ-ㅓ-ㅗ-ㅜ-ㅡ 순서로 연결합니다.' + rendered.closeNotice;
+    }
+    function syncRepetitionLegend() {
+      const legend = document.getElementById('repetitionLegend');
+      if (!legend) return;
+      const active = selectedView === 'speaker' && selectedSpeaker !== 'all';
+      legend.classList.toggle('hidden', !active);
+      legend.querySelectorAll('[data-repetition]').forEach(button => {
+        const isActive = selectedRepetition === 'all' || Number(button.dataset.repetition) === Number(selectedRepetition);
+        button.classList.toggle('active', isActive);
+        button.classList.toggle('inactive', !isActive);
+        button.setAttribute('aria-pressed', selectedRepetition !== 'all' && isActive ? 'true' : 'false');
+      });
+    }
+    function renderVowelDataPanel() {
+      const panel = document.getElementById('vowelDataPanel');
+      const body = document.getElementById('vowelDataBody');
+      const head = document.getElementById('vowelDataHead');
+      const title = document.getElementById('vowelDataTitle');
+      const note = document.getElementById('vowelDataNote');
+      if (!panel || !body || !head) return;
+      const active = selectedView === 'vowel' && hasSelectedVowels();
+      panel.classList.toggle('hidden', !active);
+      if (!active) return;
+      const multipleVowels = selectedVowels.length > 1;
+      const selectedLabel = selectedVowelLabel();
+      if (title) title.textContent = '모음 ' + selectedLabel + ' F1·F2 값';
+      const groups = new Map();
+      const addItem = (key, item, config) => {
+        if (!groups.has(key)) groups.set(key, { ...config, items: [] });
+        groups.get(key).items.push(item);
+      };
+      filteredData().filter(item => isVowelSelected(item.vowel)).forEach(item => {
+        const key = 'speaker|' + item.speakerId + '|' + item.age + '|' + item.gender + '|' + item.vowel;
+        addItem(key, item, { label: item.speakerId, vowel: item.vowel, age: item.age, gender: item.gender, isAverage: false });
+      });
+      filteredAverageData().filter(item => isVowelSelected(item.vowel)).forEach(item => {
+        const key = 'average|' + averageSeriesKey(item) + '|' + item.vowel;
+        addItem(key, { ...item, tokenNo: 1 }, { label: '기준 평균 · ' + (item.averageReference || '기존 평균값'), vowel: item.vowel, age: item.age, gender: item.gender, isAverage: true });
+      });
+      const rows = [...groups.values()].sort((a, b) => {
+        if (a.isAverage !== b.isAverage) return a.isAverage ? 1 : -1;
+        const labelCompare = String(a.label).localeCompare(String(b.label), 'ko');
+        return labelCompare || VOWELS.indexOf(a.vowel) - VOWELS.indexOf(b.vowel);
+      });
+      const maxRepetition = Math.max(3, ...rows.flatMap(row => row.items.map(item => Number(item.tokenNo) || 1)));
+      const pairMarkup = item => item
+        ? '<span class="formant-pair"><strong>F1</strong> ' + esc(item.f1) + '<br><strong>F2</strong> ' + esc(item.f2) + '</span>'
+        : '<span class="muted">·</span>';
+      const header = '<tr><th>자료</th>' + (multipleVowels ? '<th>모음</th>' : '') + '<th>연령대</th><th>성별</th>' + Array.from({ length: maxRepetition }, (_, index) => '<th>' + (index === 0 ? '기준값·1회' : (index + 1) + '회') + '</th>').join('') + '</tr>';
+      const bodyMarkup = rows.length
+        ? rows.map(row => {
+            const cells = Array.from({ length: maxRepetition }, (_, index) => {
+              const repetition = index + 1;
+              const item = row.items.find(value => (Number(value.tokenNo) || 1) === repetition);
+              return '<td>' + (row.isAverage && repetition === 1 ? '<span class="formant-pair"><strong>기준값</strong><br>' + pairMarkup(item) + '</span>' : pairMarkup(item)) + '</td>';
+            }).join('');
+            const vowelCell = multipleVowels ? '<td>' + esc(row.vowel) + '</td>' : '';
+            return '<tr class="' + (row.isAverage ? 'average-row' : '') + '"><td>' + esc(row.label) + '</td>' + vowelCell + '<td>' + esc(row.age || '미입력') + '</td><td>' + esc(row.gender === 'female' ? '여성' : row.gender === 'male' ? '남성' : '기타') + '</td>' + cells + '</tr>';
+          }).join('')
+        : '<tr><td class="vowel-data-empty" colspan="' + (3 + maxRepetition + (multipleVowels ? 1 : 0)) + '">현재 필터에 해당하는 ' + esc(selectedLabel) + ' 값이 없습니다.</td></tr>';
+      head.innerHTML = header;
+      body.innerHTML = bodyMarkup;
+      if (note) note.textContent = rows.length + '개 자료. 선택한 모음별로 같은 화자의 반복 토큰을 회차별로 보존하고, 연구 평균은 기준값으로 별도 표시합니다.';
     }
     function pointOpacity(d) {
-      if (selectedVowel !== 'all') return d.vowel === selectedVowel ? 1 : 0.28;
+      if (selectedView === 'vowel') return hasSelectedVowels() ? (isVowelSelected(d.vowel) ? 1 : 0) : 0.28;
+      if (hasSelectedVowels()) return isVowelSelected(d.vowel) ? 1 : 0.28;
       if (d.source === 'microphone') return 1;
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 0.16;
       if (selectedGender === 'all') return 0.82;
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
     function pointColorClass(d) {
-      if (selectedVowel !== 'all' && d.vowel !== selectedVowel) return 'muted-point';
-      if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
       if (d.source === 'microphone') return 'mic-point';
+      if (hasSelectedVowels() && !isVowelSelected(d.vowel)) return 'muted-point';
+      if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
     }
     function locationLabel(d) {
       if (d.region === '해외') return d.country ? `해외 · ${d.country}` : '해외';
       return d.region || '미입력';
     }
-    function updateRegionField() {
-      const region = document.getElementById('region');
-      const countryField = document.getElementById('overseasCountryField');
-      const country = document.getElementById('overseasCountry');
-      const isOverseas = region.value === '해외';
-      countryField.hidden = !isOverseas;
-      country.required = isOverseas;
-      if (!isOverseas) country.value = '';
-    }
     function updateInputMode() {
       const isAverage = document.getElementById('age').value === 'average';
       const speakerIdField = document.getElementById('speakerIdField');
-      const regionField = document.getElementById('regionField');
-      const countryField = document.getElementById('overseasCountryField');
       const nationalityField = document.getElementById('nationalityField');
+      const averageReferenceField = document.getElementById('averageReferenceField');
       const speakerId = document.getElementById('speakerId');
-      const region = document.getElementById('region');
-      const country = document.getElementById('overseasCountry');
       const nationality = document.getElementById('nationality');
+      const averageReference = document.getElementById('averageReference');
       const caption = document.getElementById('pointFormCaption');
       const note = document.getElementById('inputRuleNote');
-      [speakerIdField, regionField, countryField, nationalityField].forEach(field => { if (field) field.hidden = isAverage; });
-      [speakerId, region, country, nationality].forEach(field => { if (field) field.disabled = isAverage; });
+      [speakerIdField, nationalityField].forEach(field => { if (field) field.hidden = isAverage; });
+      if (averageReferenceField) averageReferenceField.hidden = !isAverage;
+      [speakerId, nationality].forEach(field => { if (field) field.disabled = isAverage; });
+      if (averageReference) {
+        averageReference.disabled = !isAverage;
+        averageReference.required = isAverage;
+      }
       speakerId.required = !isAverage;
-      region.required = !isAverage;
-      country.required = !isAverage && region.value === '해외';
       if (isAverage) {
         speakerId.value = '';
-        region.value = '';
-        country.value = '';
         nationality.value = '대한민국';
-        caption.textContent = '성별 평균의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 평균값으로 추가됩니다.';
-        note.textContent = '평균을 선택하면 화자 ID·지역 없이 성별 평균값으로 저장됩니다. 같은 성별·모음 평균은 중복 입력할 수 없습니다.';
+        if (caption) caption.textContent = '성별 평균의 8개 모음과 참고 논문·자료를 한 번에 입력합니다. 비워 둔 모음은 건너뜁니다.';
+        if (note) note.textContent = '같은 연령대·성별이라도 참고 논문·자료가 다르면 여러 평균 결과를 각각 추가할 수 있습니다.';
       } else {
-        caption.textContent = '한 화자의 8개 모음을 한 화면에서 입력합니다. 비워 둔 모음은 건너뛰고, 입력한 값만 추가됩니다.';
-        note.textContent = '같은 ID에 이미 입력한 모음은 다른 값으로 덮어쓸 수 없습니다. 기존 값을 삭제한 뒤 다시 입력해 주세요.';
-        updateRegionField();
+        if (caption) caption.textContent = '한 화자의 모음값을 입력합니다. 지역 선택 없이 화자 ID·국적·성별·연령대와 모음값을 입력합니다.';
+        if (note) note.textContent = '같은 화자 ID의 같은 모음도 여러 번 입력할 수 있습니다. 입력할 때마다 1회, 2회처럼 별도의 반복 토큰으로 저장됩니다.';
       }
     }
     function renderBatchInputGrid() {
@@ -830,27 +1233,34 @@
         <div class="batch-input-card">
           <div class="batch-vowel-head"><strong>${vowel}</strong><span>${VOWEL_SYLLABLES[vowel]}</span></div>
           <div class="batch-formant-grid">
-            <label class="batch-formant-label">F1<input class="batch-formant-input" id="batch-f1-${vowel}" type="number" min="100" max="1500" step="0.1" placeholder="430" /></label>
-            <label class="batch-formant-label">F2<input class="batch-formant-input" id="batch-f2-${vowel}" type="number" min="400" max="3500" step="0.1" placeholder="1900" /></label>
+            <label class="batch-formant-label">F1<input class="batch-formant-input" id="${batchFieldId('f1', vowel)}" type="number" min="100" max="1500" step="any" placeholder="430" /></label>
+            <label class="batch-formant-label">F2<input class="batch-formant-input" id="${batchFieldId('f2', vowel)}" type="number" min="400" max="3500" step="any" placeholder="1900" /></label>
           </div>
         </div>`).join('');
     }
+    function batchFieldId(formant, vowel) {
+      return `batch-${formant}-${VOWELS.indexOf(vowel)}`;
+    }
     function getBatchFormantValue(vowel, formant) {
-      return document.getElementById(`batch-${formant}-${vowel}`).value.trim();
+      return document.getElementById(batchFieldId(formant, vowel)).value.trim();
     }
 
     function render() {
       refreshDataSelectors();
+      syncFilterControls();
+      updateFilterSummary();
       drawGrid();
+      syncReferenceZoneControls();
+      drawReferenceZones();
       const layer = document.getElementById('pointsLayer');
       const visible = filteredData();
       const visibleAverages = filteredAverageData();
-      const corpusPoints = data.filter(d => !isLegacyAverageSpeaker(d)).map(d => {
+      const corpusPoints = data.filter(d => !isLegacyAverageSpeaker(d) && (selectedGender === 'all' || d.gender === selectedGender)).map(d => {
         const fontSize = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? 11 : 9;
         const selectedClass = selectedSpeaker !== 'all' && d.speakerId === selectedSpeaker ? ' selected-speaker' : '';
         return `<text class='point vowel-point ${pointColorClass(d)}${selectedClass}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='${fontSize}' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`;
       }).join('');
-      const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='11' opacity='1' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
+      const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='11' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
       const micMarkup = micPoint ? `<text class='point vowel-point ${pointColorClass(micPoint)} mic-point' x='${xScale(micPoint.f2)}' y='${yScale(micPoint.f1)}' font-size='12' opacity='1' data-id='${esc(micPoint.id)}' data-vowel='${esc(micPoint.vowel)}' aria-label='${esc(micPoint.vowel)}'>${esc(micPoint.vowel)}</text><text class='mic-label' x='${xScale(micPoint.f2)+11}' y='${yScale(micPoint.f1)-11}'>내 발음</text>` : '';
       layer.innerHTML = corpusPoints + averagePoints + micMarkup;
       layer.querySelectorAll('.point').forEach(point => {
@@ -863,20 +1273,24 @@
         point.addEventListener('mouseleave', hideTooltip);
         point.addEventListener('click', () => {
           if (!d.vowel) return;
-          selectedVowel = d.vowel;
+          if (!pointSelectionReturnState) pointSelectionReturnState = { selectedView, selectedVowels: [...selectedVowels], selectedSpeaker, selectedAverageSeries, selectedGender, selectedAge, selectedRepetition };
+          selectedView = 'vowel';
+          selectedVowels = [d.vowel];
           selectedAverageSeries = d.source === 'average' ? averageSeriesKey(d) : 'all';
-          selectedSpeaker = d.source === 'average' ? 'all' : d.speakerId || 'all';
+          selectedSpeaker = 'all';
           selectedGender = 'all';
-          selectedAge = 'all';
+          selectedAge = d.source === 'average' ? (d.age === '평균' ? '평균' : d.age) : 'all';
+          selectedRepetition = 'all';
           document.querySelectorAll('#genderFilter button').forEach(button => button.classList.toggle('active', button.dataset.gender === selectedGender));
           document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === selectedAge));
           render();
         });
       });
       drawSpeakerShape();
+      renderVowelDataPanel();
+      syncRepetitionLegend();
       applyZoom();
       updateStats(visible.length, visibleAverages.length);
-      updateSummary(visible.length, visibleAverages.length);
     }
     function applyZoom() {
       plotContent.removeAttribute('transform');
@@ -887,17 +1301,22 @@
       if (!d) return;
       const isMic = d.source === 'microphone';
       const isAverage = d.source === 'average';
-      const genderLabel = d.gender === 'female' ? '여성' : '남성';
-      const title = isAverage ? `${d.age === '평균' ? '' : d.age + ' '}${genderLabel} 평균 · ${d.vowel}` : `${d.vowel} · ${d.speakerId}`;
-      const locationDetails = d.region === '해외'
-        ? `<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>${esc(d.country || '미입력')}</b></div>`
-        : `<div class="tooltip-row"><span>지역</span><b>${esc(locationLabel(d))}</b></div>`;
+      const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
+      const reference = d.averageReference || d.reference || '기존 평균값';
+      const title = isAverage
+        ? (d.age === '평균' ? '' : d.age + ' ') + genderLabel + ' 평균 · ' + d.vowel + ' · ' + reference
+        : d.vowel + ' · ' + d.speakerId + ' · ' + (d.tokenNo || 1) + '회';
+      const locationDetails = d.region || d.country
+        ? d.region === '해외'
+          ? '<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>' + esc(d.country || '미입력') + '</b></div>'
+          : '<div class="tooltip-row"><span>지역</span><b>' + esc(locationLabel(d)) + '</b></div>'
+        : '';
       const details = isMic
-        ? `<div class="tooltip-row"><span>자료</span><b>마이크 예비 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>${esc(d.vowel)}</b></div>`
+        ? '<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>' + esc(d.vowel) + '</b></div>'
         : isAverage
-          ? `<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div>`
-          : `<div class="tooltip-row"><span>성별</span><b>${genderLabel}</b></div><div class="tooltip-row"><span>연령대</span><b>${esc(d.age)}</b></div><div class="tooltip-row"><span>국적</span><b>${esc(d.nationality || '미입력')}</b></div>${locationDetails}`;
-      tooltip.innerHTML = `<div class="tooltip-title">${esc(title)}</div>${details}<div class="tooltip-row"><span>F1 / F2</span><b>${d.f1} / ${d.f2} Hz</b></div>`;
+          ? '<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>참고 논문·자료</span><b>' + esc(reference) + '</b></div>'
+          : '<div class="tooltip-row"><span>반복 토큰</span><b>' + (d.tokenNo || 1) + '회</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>국적</span><b>' + esc(d.nationality || '미입력') + '</b></div>' + locationDetails;
+      tooltip.innerHTML = '<div class="tooltip-title">' + esc(title) + '</div>' + details + '<div class="tooltip-row"><span>F1 / F2</span><b>' + d.f1 + ' / ' + d.f2 + ' Hz</b></div>';
       tooltip.classList.remove('hidden'); moveTooltip(e);
     }
     function moveTooltip(e) {
@@ -908,52 +1327,255 @@
       tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
     }
     function hideTooltip() { tooltip.classList.add('hidden'); }
+    function syncFilterControls() {
+      const viewButtons = document.querySelectorAll('#viewModeFilter button');
+      viewButtons.forEach(button => button.classList.toggle('active', button.dataset.view === selectedView));
+      const speakerMode = selectedView === 'speaker';
+      const vowelMode = selectedView === 'vowel';
+      const speakerLabel = document.getElementById('speakerShapeLabel');
+      const speakerSelect = document.getElementById('speakerShapeSelect');
+      const speakerSummary = document.getElementById('speakerShapeSummary');
+      const vowelLabel = document.getElementById('vowelFilterLabel');
+      const vowelFilter = document.getElementById('vowelFilter');
+      const averageLabel = document.getElementById('averageSeriesLabel');
+      const averageSelect = document.getElementById('averageSeriesSelect');
+      [speakerLabel, speakerSelect, speakerSummary].forEach(element => { if (element) element.hidden = !speakerMode; });
+      [vowelLabel, vowelFilter].forEach(element => { if (element) element.hidden = !vowelMode; });
+      if (averageLabel) averageLabel.hidden = speakerMode;
+      if (averageSelect) averageSelect.hidden = speakerMode;
+      document.querySelectorAll('#vowelFilter button').forEach(button => button.classList.toggle('active', button.dataset.vowel === 'all' ? !hasSelectedVowels() : isVowelSelected(button.dataset.vowel)));
+      syncRepetitionLegend();
+    }
+    function updateFilterSummary() {
+      const viewLabel = selectedView === 'speaker' ? '화자 삼각도' : selectedView === 'vowel' ? '특정 모음값' : '전체 분포';
+      const genderLabel = selectedGender === 'all' ? '성별 전체' : selectedGender === 'female' ? '여성' : '남성';
+      const ageLabel = selectedAge === 'all' ? '연령 전체' : selectedAge === 'average' || selectedAge === '평균' ? '평균' : selectedAge;
+      const detailLabel = selectedView === 'speaker'
+        ? (selectedSpeaker === 'all' ? '화자 선택' : selectedSpeaker)
+        : selectedView === 'vowel'
+          ? selectedVowelLabel()
+          : '';
+      const summary = viewLabel + ' · ' + genderLabel + ' · ' + ageLabel + (detailLabel ? ' · ' + detailLabel : '');
+      const target = document.getElementById('filterSummaryText');
+      if (target) target.textContent = summary;
+    }
     function updateStats(visibleCount, visibleAverageCount) {
-      document.getElementById('pointCount').textContent = visibleCount + visibleAverageCount;
       document.getElementById('recordCount').textContent = data.length;
       document.getElementById('speakerCount').textContent = new Set(data.map(d => d.speakerId)).size;
       document.getElementById('vowelCount').textContent = new Set(data.map(d => d.vowel)).size;
       document.getElementById('averageCount').textContent = averageData.length;
-      document.getElementById('dataStatus').textContent = `${data.length}개 토큰 · ${new Set(data.map(d => d.speakerId)).size}명 · 평균 ${averageData.length}개`;
+      const sharedLabel = sharedDataState === 'ready' ? '공유 연결됨' : sharedDataState === 'error' ? '공유 연결 오류' : '공유 확인 중';
+      const dataStatus = document.getElementById('dataStatus');
+      dataStatus.textContent = data.length + '개 토큰 · ' + new Set(data.map(d => d.speakerId)).size + '명 · 평균 ' + averageData.length + '개 · ' + sharedLabel;
+      dataStatus.title = sharedDataError || '공유 데이터 상태: ' + sharedLabel;
+      updateFilterSummary();
     }
-    function updateSummary(visibleCount, visibleAverageCount) {
-      const gender = selectedGender === 'all' ? '전체 성별' : selectedGender === 'female' ? '여성' : '남성';
-      const age = selectedAge === 'all' ? '전체 연령대' : selectedAge;
-      const vowelFocus = selectedVowel === 'all' ? '' : ` · ${selectedVowel} 모음 강조` ;
-      document.getElementById('filterSummary').textContent = `${gender} · ${age}${vowelFocus} · ${visibleCount}개 화자값 · ${visibleAverageCount}개 평균값이 표시되고 있습니다.${micPoint ? ' 파란 모음 문자는 내 발음 예비 분석입니다.' : ''}`;
-    }
-
     function updateMicPrompt() {
       const vowel = document.getElementById('micVowel').value;
-      document.getElementById('micPrompt').textContent = VOWEL_CARRIER_SENTENCES[vowel];
-    }
-
-    function normalizeSttText(text) {
-      return String(text || '').normalize('NFKC').toLowerCase().replace(/[^가-힣a-z0-9]/g, '');
-    }
-    function sttMatchesTarget(candidates, target) {
-      const normalizedTarget = normalizeSttText(target);
-      if (!normalizedTarget) return false;
-      return [...new Set(candidates.filter(Boolean))].some(candidate => normalizeSttText(candidate).includes(normalizedTarget));
+      const syllable = VOWEL_SYLLABLES[vowel] || vowel;
+      document.getElementById('micPrompt').textContent = String(vowel) + ' (' + String(syllable) + ')를 길게 발음하세요.';
     }
 
     function estimateMicFormants(frames, sampleRate, fftSize) {
       if (frames.length < 3) return null;
       const binCount = frames[0].length;
-      const average = new Float32Array(binCount);
-      frames.forEach(frame => frame.forEach((value, index) => { average[index] += value; }));
-      const peakInRange = (minHz, maxHz) => {
-        const start = Math.max(1, Math.floor(minHz * fftSize / sampleRate));
-        const end = Math.min(binCount - 1, Math.ceil(maxHz * fftSize / sampleRate));
-        let bestIndex = -1; let bestValue = -Infinity;
-        for (let index = start; index <= end; index += 1) {
-          if (average[index] > bestValue) { bestValue = average[index]; bestIndex = index; }
-        }
-        return bestIndex < 0 ? null : Math.round(bestIndex * sampleRate / fftSize);
+      const halfWidth = Math.max(3, Math.round((90 * fftSize) / sampleRate));
+      const median = values => {
+        const sorted = [...values].sort((a, b) => a - b);
+        if (!sorted.length) return null;
+        const middle = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
       };
-      const f1 = peakInRange(250, 1000);
-      const f2 = peakInRange(700, 3000);
-      return f1 && f2 ? { f1, f2 } : null;
+      const robustMedian = values => {
+        if (values.length < 3) return median(values);
+        const sorted = [...values].sort((a, b) => a - b);
+        const q1 = sorted[Math.floor((sorted.length - 1) * 0.25)];
+        const q3 = sorted[Math.floor((sorted.length - 1) * 0.75)];
+        const iqr = q3 - q1;
+        const filtered = iqr > 0 ? sorted.filter(value => value >= q1 - iqr * 1.5 && value <= q3 + iqr * 1.5) : sorted;
+        return median(filtered);
+      };
+      const estimateFrame = frame => {
+        const spectrum = new Float64Array(binCount);
+        for (let index = 0; index < binCount; index += 1) {
+          const db = Number(frame[index]);
+          spectrum[index] = Number.isFinite(db) ? 10 ** (db / 20) : 0;
+        }
+        const smooth = new Float64Array(binCount);
+        for (let index = 1; index < binCount - 1; index += 1) {
+          let total = 0; let count = 0;
+          for (let offset = -halfWidth; offset <= halfWidth; offset += 1) {
+            const value = spectrum[index + offset];
+            if (value !== undefined && Number.isFinite(value)) { total += value; count += 1; }
+          }
+          smooth[index] = count ? total / count : 0;
+        }
+        const peakInRange = (minHz, maxHz) => {
+          const start = Math.max(2, Math.floor(minHz * fftSize / sampleRate));
+          const end = Math.min(binCount - 3, Math.ceil(maxHz * fftSize / sampleRate));
+          let bestIndex = -1; let bestScore = -Infinity;
+          for (let index = start; index <= end; index += 1) {
+            if (smooth[index] < smooth[index - 1] || smooth[index] < smooth[index + 1]) continue;
+            const shoulder = Math.max(smooth[Math.max(1, index - halfWidth)], smooth[Math.min(binCount - 2, index + halfWidth)]);
+            const score = smooth[index] + Math.max(0, smooth[index] - shoulder) * 0.8;
+            if (score > bestScore) { bestScore = score; bestIndex = index; }
+          }
+          if (bestIndex < 0) {
+            for (let index = start; index <= end; index += 1) {
+              if (smooth[index] > bestScore) { bestScore = smooth[index]; bestIndex = index; }
+            }
+          }
+          if (bestIndex < 1) return null;
+          const y1 = Math.log(Math.max(smooth[bestIndex - 1], 1e-9));
+          const y2 = Math.log(Math.max(smooth[bestIndex], 1e-9));
+          const y3 = Math.log(Math.max(smooth[bestIndex + 1], 1e-9));
+          const denominator = y1 - 2 * y2 + y3;
+          const offset = denominator ? Math.max(-0.5, Math.min(0.5, 0.5 * (y1 - y3) / denominator)) : 0;
+          return (bestIndex + offset) * sampleRate / fftSize;
+        };
+        const f1 = peakInRange(250, 1000);
+        const f2 = f1 ? peakInRange(Math.max(700, f1 + 180), 3200) : peakInRange(700, 3200);
+        return f1 && f2 && f2 > f1 ? { f1, f2 } : null;
+      };
+      const estimates = frames.map(estimateFrame).filter(Boolean);
+      if (estimates.length < 3) return null;
+      const f1 = robustMedian(estimates.map(item => item.f1));
+      const f2 = robustMedian(estimates.map(item => item.f2));
+      return f1 && f2 ? { f1: Math.round(f1), f2: Math.round(f2), frameCount: estimates.length } : null;
+    }
+
+
+    function setMicFormantReadout(formants) {
+      const f1 = formants && Number.isFinite(Number(formants.f1)) ? Number(formants.f1) : NaN;
+      const f2 = formants && Number.isFinite(Number(formants.f2)) ? Number(formants.f2) : NaN;
+      if (micF1Value) micF1Value.textContent = Number.isFinite(f1) ? f1.toFixed(1) : '—';
+      if (micF2Value) micF2Value.textContent = Number.isFinite(f2) ? f2.toFixed(1) : '—';
+    }
+
+    function drawMicSpectrum(snapshot = micSpectrumSnapshot, formants = micServerFormants) {
+      const canvas = micSpectrumCanvas;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(280, Math.round(rect.width || 520));
+      const height = 170;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      const pad = { top: 18, right: 12, bottom: 30, left: 38 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+      const dbMin = -100;
+      const dbMax = 0;
+      const sampleRate = Number(snapshot && snapshot.sampleRate) || 16000;
+      const nyquist = sampleRate / 2;
+      const maxFrequency = Math.min(3000, nyquist);
+      const frames = snapshot && Array.isArray(snapshot.frames)
+        ? snapshot.frames.filter(frame => frame && typeof frame.length === 'number' && frame.length > 0)
+        : [];
+      const xForFrequency = frequency => pad.left + (frequency / maxFrequency) * plotW;
+      const yForDb = db => pad.top + (1 - (Math.max(dbMin, Math.min(dbMax, db)) - dbMin) / (dbMax - dbMin)) * plotH;
+
+      ctx.font = '9px system-ui, sans-serif';
+      ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      for (let frequency = 0; frequency <= maxFrequency; frequency += 1000) {
+        const x = xForFrequency(frequency);
+        ctx.strokeStyle = '#edf0f4';
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.stroke();
+        ctx.fillStyle = '#8995a6';
+        ctx.fillText(String(frequency), x, height - 11);
+      }
+      ctx.textAlign = 'right';
+      for (let db = -80; db <= 0; db += 20) {
+        const y = yForDb(db);
+        ctx.strokeStyle = '#f1f3f6';
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+        ctx.fillStyle = '#a0a9b6';
+        ctx.fillText(String(db), pad.left - 5, y + 3);
+      }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#7d8999';
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillText('Frequency (Hz)', pad.left + plotW / 2, height - 1);
+
+      if (!frames.length) {
+        ctx.fillStyle = '#9aa6b6';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillText('녹음된 주파수 자료가 없습니다.', width / 2, pad.top + plotH / 2);
+        return;
+      }
+
+      const binCount = frames.reduce((maximum, frame) => Math.max(maximum, frame.length), 0);
+      const sampledFrames = frames.length > 60
+        ? frames.filter((frame, index) => index % Math.ceil(frames.length / 60) === 0)
+        : frames;
+      const aggregate = new Float32Array(binCount);
+      for (let bin = 0; bin < binCount; bin += 1) {
+        const values = [];
+        sampledFrames.forEach(frame => {
+          const value = Number(frame[bin]);
+          if (Number.isFinite(value)) values.push(value);
+        });
+        if (!values.length) { aggregate[bin] = dbMin; continue; }
+        values.sort((a, b) => a - b);
+        aggregate[bin] = values[Math.floor(values.length / 2)];
+      }
+      const maxBin = Math.min(binCount - 1, Math.floor((maxFrequency / nyquist) * binCount));
+      const points = [];
+      for (let bin = 0; bin <= maxBin; bin += 1) {
+        const frequency = (bin / binCount) * nyquist;
+        const left = aggregate[Math.max(0, bin - 1)];
+        const middle = aggregate[bin];
+        const right = aggregate[Math.min(maxBin, bin + 1)];
+        const db = (left + middle + right) / 3;
+        points.push({ x: xForFrequency(frequency), y: yForDb(db) });
+      }
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, pad.top + plotH);
+      points.forEach(point => ctx.lineTo(point.x, point.y));
+      ctx.lineTo(points[points.length - 1].x, pad.top + plotH);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(78, 124, 243, .13)';
+      ctx.fill();
+      ctx.beginPath();
+      points.forEach((point, index) => index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y));
+      ctx.strokeStyle = 'rgba(78, 124, 243, .86)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const markers = [
+        { label: 'F1', frequency: Number(formants && formants.f1) },
+        { label: 'F2', frequency: Number(formants && formants.f2) }
+      ].filter(marker => Number.isFinite(marker.frequency) && marker.frequency > 0 && marker.frequency <= maxFrequency);
+      markers.forEach(marker => {
+        const x = xForFrequency(marker.frequency);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.strokeStyle = '#2f9d68';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#2f9d68';
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.fillText(marker.label, x, 10);
+        ctx.font = '9px system-ui, sans-serif';
+        ctx.fillText(Math.round(marker.frequency) + ' Hz', x, 21);
+      });
     }
 
     function monitorMic(timestamp) {
@@ -963,268 +1585,504 @@
         micAnalyser.getFloatFrequencyData(frame);
         let peak = -Infinity;
         frame.forEach(value => { if (value > peak) peak = value; });
-        if (peak > -78) micSpectrumFrames.push(frame);
+        const waveform = new Float32Array(micAnalyser.fftSize);
+        micAnalyser.getFloatTimeDomainData(waveform);
+        let sumSquares = 0;
+        waveform.forEach(value => { sumSquares += value * value; });
+        const rms = Math.sqrt(sumSquares / Math.max(1, waveform.length));
+        const rmsDb = 20 * Math.log10(Math.max(rms, 1e-8));
+        if (peak > -78) {
+          micSpectrumFrames.push(frame);
+          if (micSpectrumFrames.length > 80) micSpectrumFrames.shift();
+        }
+        micActivityLevels.push({ timestamp, rmsDb });
+        if (micActivityLevels.length > 120) micActivityLevels.shift();
+        micSpectrumSnapshot = {
+          frames: micSpectrumFrames.slice(),
+          sampleRate: micAudioContext ? micAudioContext.sampleRate : 16000,
+          fftSize: micAnalyser.fftSize
+        };
+        drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
         micLastSampleAt = timestamp;
       }
       micAnimationFrame = requestAnimationFrame(monitorMic);
     }
 
-    function scheduleMicFinish(delay = 350) {
-      if (micFinishTimer) clearTimeout(micFinishTimer);
-      micFinishTimer = setTimeout(() => {
-        micFinishTimer = null;
-        if (micStopRequested) finishMicRecording();
-      }, delay);
-    }
-    async function finishMicRecording() {
-      if (!micAnalysisSnapshot) return;
-      if (micFinishTimer) { clearTimeout(micFinishTimer); micFinishTimer = null; }
-      const analysis = micAnalysisSnapshot;
-      micAnalysisSnapshot = null;
-      const vowel = document.getElementById('micVowel').value;
-      const target = VOWEL_STT_TARGETS[vowel];
-      let recordedAudio = null;
-      if (FORMANT_API_URL && micRecordingPromise) {
-        try { recordedAudio = await micRecordingPromise; } catch (error) {}
-      }
-      const useServer = Boolean(FORMANT_API_URL && recordedAudio && recordedAudio.size);
-      if (useServer) {
-        document.getElementById('micStatus').textContent = 'Whisper와 Praat/Parselmouth 서버에서 분석 중입니다.';
-        try {
-          const formData = new FormData();
-          formData.append('audio', recordedAudio, 'recording.webm');
-          formData.append('target_vowel', vowel);
-          formData.append('target_word', target);
-          const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData });
-          const payload = await response.json();
-          if (!response.ok || !payload.ok) {
-            const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
-            throw new Error(detail || payload.message || '서버 분석에 실패했습니다.');
-          }
-          micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: 'Praat 서버 분석', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
-          document.getElementById('micStatus').textContent = 'Whisper 전사와 Praat/Parselmouth F1·F2 분석이 완료되었습니다.';
-          document.getElementById('micResult').innerHTML = '<strong>서버 분석 완료</strong><br>전사 결과: ' + esc(payload.transcript || target) + '<br>' + esc(vowel) + ' · F1 ' + payload.f1 + ' Hz · F2 ' + payload.f2 + ' Hz<br>측정: 목표모음 추정 구간의 중앙 20% · ' + esc(payload.method || 'Formant Burg');
-          render();
-          return;
-        } catch (error) {
-          document.getElementById('micStatus').textContent = '서버 분석에 실패했습니다. 브라우저 예비 분석으로 전환합니다.';
-          document.getElementById('micResult').innerHTML = '<strong>서버 분석 실패</strong><br>' + esc(error.message || '분석 서버에 연결할 수 없습니다.');
-        }
-      }
-      const primaryCandidates = micRecognitionFinalCandidates.length ? micRecognitionFinalCandidates : micRecognitionCandidates;
-      const sttCandidates = [...new Set([...primaryCandidates, micRecognitionFinalTranscript || (!micRecognitionFinalCandidates.length ? micRecognitionTranscript : '')].filter(Boolean))];
-      if (!sttCandidates.length) {
-        document.getElementById('micStatus').textContent = 'STT 전사 결과를 받지 못했습니다. 문장을 조금 더 크게 읽고 다시 시도해 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>인식된 전사 결과가 없습니다. 마이크 권한과 입력 장치를 확인해 주세요.';
-        return;
-      }
-      if (!sttMatchesTarget(sttCandidates, target)) {
-        document.getElementById('micStatus').textContent = '표적 단어가 정확히 전사되지 않았습니다. 운반 문장을 다시 읽어 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>STT 확인 실패</strong><br>전사 결과: ' + esc(micRecognitionTranscript) + '<br>큰따옴표 안의 “' + esc(target) + '”가 확인되지 않았습니다. 운반 문장을 다시 읽어 주세요.';
-        return;
-      }
-      document.getElementById('micStatus').textContent = 'STT 전사가 확인되었습니다. 브라우저 예비 F1·F2를 추정 중입니다.';
-      const estimate = estimateMicFormants(analysis.frames, analysis.sampleRate, analysis.fftSize);
-      if (!estimate) {
-        document.getElementById('micStatus').textContent = '음성 분석값을 얻지 못했습니다. 조금 더 크게 다시 읽어 주세요.';
-        document.getElementById('micResult').innerHTML = '<strong>F1·F2 분석 실패</strong><br>전사 결과: ' + esc(micRecognitionTranscript || target);
-        return;
-      }
-      micPoint = { id: 'mic-' + Date.now(), speakerId: '내 발음', region: '브라우저 마이크', nationality: '내 발음', gender: 'microphone', age: '분석', vowel, f1: estimate.f1, f2: estimate.f2, source: 'microphone' };
-      document.getElementById('micStatus').textContent = '브라우저 예비 F1·F2 추정이 완료되었습니다. 그래프의 파란 점을 확인해 주세요.';
-      document.getElementById('micResult').innerHTML = '<strong>브라우저 예비 추정</strong><br>전사 결과: ' + esc(micRecognitionTranscript || target) + '<br>' + esc(vowel) + ' · F1 ' + estimate.f1 + ' Hz · F2 ' + estimate.f2 + ' Hz';
-      render();
+
+    function writeWavAscii(view, offset, value) {
+      for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index));
     }
 
-    async function startMicRecording() {
+    function encodeMonoWav(samples, sampleRate) {
+      const safeRate = Math.max(8000, Math.round(Number(sampleRate) || 16000));
+      const dataLength = samples.length * 2;
+      const buffer = new ArrayBuffer(44 + dataLength);
+      const view = new DataView(buffer);
+      writeWavAscii(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeWavAscii(view, 8, 'WAVE');
+      writeWavAscii(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, safeRate, true);
+      view.setUint32(28, safeRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeWavAscii(view, 36, 'data');
+      view.setUint32(40, dataLength, true);
+      for (let index = 0; index < samples.length; index += 1) {
+        const sample = Math.max(-1, Math.min(1, Number(samples[index]) || 0));
+        view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function getRecentMicPcmWindow(seconds = 1.8) {
+      if (!micPcmSampleRate || micPcmSampleCount < Math.round(micPcmSampleRate * 0.8)) return null;
+      const availableLength = micPcmSampleCount;
+      const available = new Float32Array(availableLength);
+      let writeOffset = availableLength;
+      for (let index = micPcmChunks.length - 1; index >= 0 && writeOffset > 0; index -= 1) {
+        const chunk = micPcmChunks[index];
+        const take = Math.min(writeOffset, chunk.length);
+        writeOffset -= take;
+        available.set(chunk.subarray(chunk.length - take), writeOffset);
+      }
+      if (writeOffset !== 0) return null;
+      const frameLength = Math.max(1, Math.round(micPcmSampleRate * 0.02));
+      const hopLength = Math.max(1, Math.round(frameLength / 2));
+      let lastActiveEnd = -1;
+      for (let start = 0; start + frameLength <= available.length; start += hopLength) {
+        let sumSquares = 0;
+        for (let index = start; index < start + frameLength; index += 1) sumSquares += available[index] * available[index];
+        const rms = Math.sqrt(sumSquares / frameLength);
+        if (rms > 0.0035) lastActiveEnd = start + frameLength;
+      }
+      if (lastActiveEnd < 0) return null;
+      const tailSamples = Math.round(micPcmSampleRate * 0.12);
+      const end = Math.min(available.length, lastActiveEnd + tailSamples);
+      const targetLength = Math.min(available.length, Math.round(micPcmSampleRate * seconds));
+      const start = Math.max(0, end - targetLength);
+      const output = available.slice(start, end);
+      return output.length >= Math.round(micPcmSampleRate * 0.25) ? output : null;
+    }
+
+    function updateContinuousMicUi(isOn) {
+      if (micToggleBtn) {
+        micToggleBtn.textContent = isOn ? '마이크 일시정지' : '마이크 켜기';
+        micToggleBtn.classList.toggle('submit-button', !isOn);
+        micToggleBtn.classList.toggle('secondary-button', isOn);
+      }
+      if (micLiveIndicator) {
+        micLiveIndicator.textContent = isOn ? '듣는 중' : '꺼짐';
+        micLiveIndicator.classList.toggle('on', isOn);
+      }
+    }
+
+    async function sendContinuousAnalysis() {
+      if (!micStream || micServerBusy || !FORMANT_API_URL || !micPcmSampleRate) return;
+      const samples = getRecentMicPcmWindow(1.8);
+      if (!samples) return;
+      const generation = micContinuousGeneration;
+      const vowel = document.getElementById('micVowel').value;
+      micServerBusy = true;
+      let timeoutId = null;
+      try {
+        const formData = new FormData();
+        formData.append('audio', encodeMonoWav(samples, micPcmSampleRate), 'continuous-window.wav');
+        formData.append('target_vowel', vowel);
+        const referenceAveragesForMic = averageData
+          .filter(item => item && item.vowel === vowel && (item.gender === 'female' || item.gender === 'male') && Number.isFinite(Number(item.f1)) && Number.isFinite(Number(item.f2)))
+          .map(item => ({ gender: item.gender, vowel: item.vowel, f1: Number(item.f1), f2: Number(item.f2) }));
+        formData.append('reference_averages', JSON.stringify(referenceAveragesForMic));
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 15000);
+        const response = await fetch(FORMANT_API_URL.replace(/\/$/, '') + '/analyze', { method: 'POST', body: formData, signal: controller.signal });
+        if (timeoutId) clearTimeout(timeoutId);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail.message : payload.detail;
+          throw new Error(detail || payload.message || 'Praat 서버 분석에 실패했습니다.');
+        }
+        if (generation !== micContinuousGeneration || !micStream) return;
+        micLastLiveError = '';
+        micServerFormants = { f1: payload.f1, f2: payload.f2 };
+        setMicFormantReadout(micServerFormants);
+        drawMicSpectrum(micSpectrumSnapshot, micServerFormants);
+        if (micSpectrumNote) micSpectrumNote.textContent = '파란 면적: 실시간 녹음 FFT · 초록 세로선: 서버 Praat/Parselmouth F1·F2';
+        micPoint = { id: 'mic-live', speakerId: '내 발음', region: 'Praat 서버 연속 분석', nationality: '내 발음', gender: 'microphone', age: '실시간', vowel, f1: payload.f1, f2: payload.f2, source: 'microphone' };
+         document.getElementById('micStatus').textContent = '마이크가 켜져 있습니다. 안정 구간을 계속 분석합니다.';
+        render();
+      } catch (error) {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (generation !== micContinuousGeneration || !micStream) return;
+        micLastLiveError = error && error.name === 'AbortError' ? '서버 분석이 15초 안에 끝나지 않았습니다.' : (error.message || 'Praat 서버 분석에 실패했습니다.');
+        if (micServerFormants) {
+          document.getElementById('micStatus').textContent = '마지막 안정값을 유지하고 새 안정 구간을 기다리는 중입니다.';
+        } else {
+          setMicFormantReadout(null);
+          document.getElementById('micStatus').textContent = '안정적인 F1·F2 구간을 기다리는 중입니다. ' + micLastLiveError;
+        }
+        render();
+      } finally {
+        micServerBusy = false;
+      }
+    }
+
+    function releaseContinuousMicResources() {
+      if (micContinuousTimer) clearInterval(micContinuousTimer);
+      micContinuousTimer = null;
+      if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
+      micAnimationFrame = null;
+      if (micCaptureProcessor) {
+        micCaptureProcessor.onaudioprocess = null;
+        try { micCaptureProcessor.disconnect(); } catch (error) {}
+      }
+      micCaptureProcessor = null;
+      if (micStream) micStream.getTracks().forEach(track => track.stop());
+      micStream = null;
+      if (micAudioContext) {
+        try { micAudioContext.close(); } catch (error) {}
+      }
+      micAnalyser = null;
+      micAudioContext = null;
+      micPcmChunks = [];
+      micPcmSampleCount = 0;
+      micPcmSampleRate = 0;
+      micServerBusy = false;
+    }
+
+    async function startContinuousMic() {
       if (micStream) return;
       const status = document.getElementById('micStatus');
-      const startButton = document.getElementById('micStartBtn');
-      const stopButton = document.getElementById('micStopBtn');
-      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognitionClass && !FORMANT_API_URL) {
-        status.textContent = '현재 브라우저에서 STT를 지원하지 않습니다. Chrome에서 다시 시도해 주세요.';
-        return;
-      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         status.textContent = '이 브라우저에서는 마이크 접근을 사용할 수 없습니다. HTTPS 주소에서 다시 시도해 주세요.';
         return;
       }
       try {
-        if (SpeechRecognitionClass) {
-          micRecognition = new SpeechRecognitionClass();
-        const recognition = micRecognition;
-        recognition.lang = 'ko-KR';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 5;
-        micRecognitionEnded = false;
-        micRecognitionCandidates = [];
-        micRecognitionFinalCandidates = [];
-        micRecognitionTranscript = '';
-        micRecognitionFinalTranscript = '';
-        micRecognitionSegments = [];
-        micRecognitionError = '';
-        micRecognitionRestartCount = 0;
-        micStopRequested = false;
-        recognition.onresult = event => {
-          const alternatives = [];
-          const finalAlternatives = [];
-          const finalTexts = [];
-          const interimTexts = [];
-          for (let i = 0; i < event.results.length; i += 1) {
-            const result = event.results[i];
-            for (let j = 0; j < result.length; j += 1) alternatives.push(result[j].transcript);
-            if (result.isFinal) {
-              const bestText = result[0] && result[0].transcript ? result[0].transcript : '';
-              finalTexts.push(bestText);
-              micRecognitionSegments[i] = bestText;
-              for (let j = 0; j < result.length; j += 1) finalAlternatives.push(result[j].transcript);
-            } else if (result[0] && result[0].transcript) {
-              interimTexts.push(result[0].transcript);
-            }
-          }
-          micRecognitionRestartCount = 0;
-          micRecognitionCandidates = [...new Set([...micRecognitionCandidates, ...alternatives].filter(Boolean))];
-          micRecognitionFinalCandidates = [...new Set([...micRecognitionFinalCandidates, ...finalAlternatives].filter(Boolean))];
-          micRecognitionFinalTranscript = micRecognitionSegments.filter(Boolean).join(' ').trim() || finalTexts.join(' ').trim();
-          micRecognitionTranscript = [micRecognitionFinalTranscript, interimTexts.join(' ').trim()].filter(Boolean).join(' ').trim() || micRecognitionCandidates[0] || '';
-          if (micRecognitionTranscript) {
-            document.getElementById('micResult').innerHTML = `<strong>STT 전사 중</strong><br>${esc(micRecognitionTranscript)}`;
-          }
-        };
-        recognition.onerror = event => {
-          micRecognitionError = event.error || 'unknown';
-        };
-        recognition.onend = () => {
-          micRecognitionEnded = true;
-          if (micStopRequested) {
-            scheduleMicFinish(350);
-            return;
-          }
-          const restartable = micStream && !['not-allowed', 'service-not-allowed', 'network', 'audio-capture', 'language-not-supported'].includes(micRecognitionError);
-          if (restartable && micRecognitionRestartCount < 2) {
-            micRecognitionRestartCount += 1;
-            setTimeout(() => {
-              if (!micStream || micStopRequested || micRecognition !== recognition) return;
-              try {
-                recognition.start();
-                micRecognitionEnded = false;
-              } catch (error) {}
-            }, 150);
-          }
-        };
-        }
+        micContinuousGeneration += 1;
+        micLastLiveError = '';
         micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) throw new Error('AudioContext unavailable');
         micAudioContext = new AudioContextClass();
         if (micAudioContext.state === 'suspended') await micAudioContext.resume();
-        if (FORMANT_API_URL) {
-          if (!window.MediaRecorder) throw new Error('MediaRecorder unavailable');
-          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-          micChunks = [];
-          micRecorder = new MediaRecorder(micStream, { mimeType });
-          micRecordingPromise = new Promise(resolve => {
-            micRecorder.ondataavailable = event => { if (event.data && event.data.size) micChunks.push(event.data); };
-            micRecorder.onstop = () => {
-              const blob = new Blob(micChunks, { type: micRecorder.mimeType || mimeType });
-              micRecorder = null;
-              resolve(blob);
-            };
-          });
-          micRecorder.start(100);
-        }
+        if (!micAudioContext.createScriptProcessor) throw new Error('ScriptProcessor unavailable');
         const source = micAudioContext.createMediaStreamSource(micStream);
         micAnalyser = micAudioContext.createAnalyser();
         micAnalyser.fftSize = 2048;
+        micCaptureProcessor = micAudioContext.createScriptProcessor(4096, 1, 1);
+        micPcmSampleRate = micAudioContext.sampleRate;
+        micPcmChunks = [];
+        micPcmSampleCount = 0;
+        micCaptureProcessor.onaudioprocess = event => {
+          if (!micStream) return;
+          const input = event.inputBuffer.getChannelData(0);
+          const copy = new Float32Array(input);
+          micPcmChunks.push(copy);
+          micPcmSampleCount += copy.length;
+          const maxSamples = Math.round(micPcmSampleRate * 4);
+          while (micPcmSampleCount > maxSamples && micPcmChunks.length) {
+            const removed = micPcmChunks.shift();
+            micPcmSampleCount -= removed.length;
+          }
+        };
         source.connect(micAnalyser);
+        source.connect(micCaptureProcessor);
         const silentOutput = micAudioContext.createGain();
         silentOutput.gain.value = 0;
-        micAnalyser.connect(silentOutput).connect(micAudioContext.destination);
+        micAnalyser.connect(silentOutput);
+        micCaptureProcessor.connect(silentOutput);
+        silentOutput.connect(micAudioContext.destination);
         micSpectrumFrames = [];
+        micActivityLevels = [];
         micLastSampleAt = 0;
-        if (micRecognition) micRecognition.start();
+        micSpectrumSnapshot = null;
+        micServerFormants = null;
         micPoint = null;
-        document.getElementById('micResult').textContent = 'STT 전사를 확인한 뒤 F1·F2를 분석합니다.';
-        render();
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        status.textContent = '문장을 읽는 중입니다. 다 읽은 뒤 녹음 중지를 눌러 주세요.';
+        setMicFormantReadout(null);
+        drawMicSpectrum(null, null);
+        if (micSpectrumNote) micSpectrumNote.textContent = '실시간 녹음 스펙트럼입니다. 안정적인 서버 F1·F2가 생기면 초록 세로선이 표시됩니다.';
+        updateContinuousMicUi(true);
+         status.textContent = '마이크가 켜졌습니다. 선택한 모음을 계속 발음하면 안정적인 F1·F2를 표시합니다.';
         micAnimationFrame = requestAnimationFrame(monitorMic);
+        micContinuousTimer = setInterval(sendContinuousAnalysis, 800);
+        render();
       } catch (error) {
-        if (micRecognition) {
-          try { micRecognition.abort(); } catch (e) {}
-        }
-        if (micStream) micStream.getTracks().forEach(track => track.stop());
-        if (micAudioContext) micAudioContext.close();
-        micRecognition = null;
-        micStream = null;
-        micAnalyser = null;
-        micAudioContext = null;
-        micRecognitionEnded = true;
-        status.textContent = '마이크 또는 음성 인식 권한을 얻지 못했습니다. 브라우저 권한을 확인해 주세요.';
+        releaseContinuousMicResources();
+        updateContinuousMicUi(false);
+        status.textContent = '마이크 권한 또는 연속 녹음 기능을 사용할 수 없습니다. 브라우저 권한을 확인해 주세요.';
       }
     }
 
-    function stopMicRecording() {
-      if (!micStream || micStopRequested) return;
-      micStopRequested = true;
-      if (micAnimationFrame) cancelAnimationFrame(micAnimationFrame);
-      micAnalysisSnapshot = micAudioContext && micAnalyser ? {
-        frames: micSpectrumFrames.slice(),
-        sampleRate: micAudioContext.sampleRate,
-        fftSize: micAnalyser.fftSize
-      } : null;
-      if (micRecorder && micRecorder.state !== 'inactive') micRecorder.stop();
-      micStream.getTracks().forEach(track => track.stop());
-      if (micAudioContext) micAudioContext.close();
-      micStream = null;
-      micAnalyser = null;
-      micAudioContext = null;
-      micAnimationFrame = null;
-      document.getElementById('micStartBtn').disabled = false;
-      document.getElementById('micStopBtn').disabled = true;
-      document.getElementById('micStatus').textContent = 'STT 전사를 확인 중입니다.';
-      if (!micRecognition) {
-        finishMicRecording();
-        return;
-      }
-      if (!micRecognitionEnded) {
-        try { micRecognition.stop(); } catch (error) { micRecognitionEnded = true; }
-      }
-      scheduleMicFinish(700);
+    function pauseContinuousMic() {
+      if (!micStream) return;
+      micContinuousGeneration += 1;
+      releaseContinuousMicResources();
+      updateContinuousMicUi(false);
+      document.getElementById('micStatus').textContent = '마이크가 일시정지되었습니다. 다시 켜면 계속 분석합니다.';
+      render();
     }
 
-    document.getElementById('micVowel').addEventListener('change', updateMicPrompt);
-    document.getElementById('region').addEventListener('change', updateRegionField);
+    function toggleContinuousMic() {
+      if (micStream) pauseContinuousMic();
+      else startContinuousMic();
+    }
+
+    function resetMicAnalysisForVowelChange() {
+      updateMicPrompt();
+      micContinuousGeneration += 1;
+      micLastLiveError = '';
+      micPoint = null;
+      micServerFormants = null;
+      setMicFormantReadout(null);
+      drawMicSpectrum(micSpectrumSnapshot, null);
+      if (micSpectrumNote) micSpectrumNote.textContent = micStream ? '새 표적 모음의 안정 구간을 기다리는 중입니다.' : '마이크를 켜면 실시간 스펙트럼과 서버 F1·F2가 표시됩니다.';
+      document.getElementById('micStatus').textContent = micStream ? '마이크가 켜져 있습니다. 새로 선택한 모음을 일정하게 발음하세요.' : '마이크를 켜면 선택한 모음을 계속 들으며 분석합니다.';
+      render();
+    }
+    document.getElementById('micVowel').addEventListener('change', resetMicAnalysisForVowelChange);
     document.getElementById('age').addEventListener('change', updateInputMode);
-    document.getElementById('micStartBtn').addEventListener('click', startMicRecording);
-    document.getElementById('micStopBtn').addEventListener('click', stopMicRecording);
+    document.getElementById('micToggleBtn').addEventListener('click', toggleContinuousMic);
+    document.getElementById('referenceZoneToggle').addEventListener('change', e => {
+      referenceZoneVisible = e.target.checked;
+      render();
+    });
+    document.getElementById('referenceZoneMaleToggle').addEventListener('change', e => {
+      referenceZoneMaleVisible = e.target.checked;
+      render();
+    });
+    document.getElementById('referenceZoneFemaleToggle').addEventListener('change', e => {
+      referenceZoneFemaleVisible = e.target.checked;
+      render();
+    });
+    window.addEventListener('beforeunload', () => { if (micStream) pauseContinuousMic(); });
+    window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
+    const filterToggle = document.getElementById('filterToggle');
+    const filterModal = document.getElementById('filterModal');
+    const filterCloseBtn = document.getElementById('filterCloseBtn');
+    function openFilterModal() {
+      filterModal.classList.remove('hidden');
+      filterToggle.setAttribute('aria-expanded', 'true');
+      filterCloseBtn.focus();
+    }
+    function closeFilterModal() {
+      filterModal.classList.add('hidden');
+      filterToggle.setAttribute('aria-expanded', 'false');
+    }
+    filterToggle.addEventListener('click', openFilterModal);
+    filterCloseBtn.addEventListener('click', closeFilterModal);
+    filterModal.addEventListener('click', e => { if (e.target === filterModal) closeFilterModal(); });
+
+    document.getElementById('viewModeFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
+      selectedView = button.dataset.view || 'overview';
+      selectedRepetition = 'all';
+      if (selectedView === 'overview') {
+        selectedSpeaker = 'all';
+        selectedVowels = [];
+        selectedAverageSeries = 'all';
+      } else if (selectedView === 'speaker') {
+        selectedVowels = [];
+        selectedAverageSeries = 'all';
+      } else if (selectedView === 'vowel') {
+        selectedSpeaker = 'all';
+        selectedAverageSeries = 'all';
+      }
+      syncFilterControls();
+      updateFilterSummary();
+      render();
+    });
     document.getElementById('genderFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedGender = button.dataset.gender;
       selectedAverageSeries = 'all';
-      selectedSpeaker = 'all';
-      selectedVowel = 'all';
       document.querySelectorAll('#genderFilter button').forEach(b => b.classList.toggle('active', b === button));
+      updateFilterSummary();
       render();
     });
     document.getElementById('ageFilter').addEventListener('click', e => {
       const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
       selectedAge = button.dataset.age;
       selectedAverageSeries = 'all';
-      selectedSpeaker = 'all';
-      selectedVowel = 'all';
       document.querySelectorAll('#ageFilter button').forEach(b => b.classList.toggle('active', b === button));
+      updateFilterSummary();
       render();
     });
     document.getElementById('speakerShapeSelect').addEventListener('change', e => {
+      pointSelectionReturnState = null;
+      selectedView = 'speaker';
       selectedSpeaker = e.target.value;
       selectedAverageSeries = 'all';
-      selectedVowel = 'all';
+      selectedVowels = [];
+      selectedRepetition = 'all';
+      syncFilterControls();
+      updateFilterSummary();
       render();
     });
+    document.getElementById('vowelFilter').addEventListener('click', e => {
+      const button = e.target.closest('button'); if (!button) return;
+      pointSelectionReturnState = null;
+      selectedView = 'vowel';
+      const vowel = button.dataset.vowel;
+      if (vowel === 'all') {
+        selectedVowels = [];
+      } else {
+        const next = selectedVowels.includes(vowel)
+          ? selectedVowels.filter(value => value !== vowel)
+          : [...selectedVowels, vowel];
+        selectedVowels = VOWELS.filter(value => next.includes(value));
+      }
+      selectedSpeaker = 'all';
+      selectedAverageSeries = 'all';
+      selectedRepetition = 'all';
+      syncFilterControls();
+      updateFilterSummary();
+      render();
+    });
+    document.getElementById('averageSeriesSelect').addEventListener('change', e => {
+      pointSelectionReturnState = null;
+      selectedView = 'overview';
+      selectedAverageSeries = e.target.value;
+      selectedSpeaker = 'all';
+      selectedVowels = [];
+      selectedRepetition = 'all';
+      if (selectedAverageSeries !== 'all') {
+        selectedAge = '평균';
+        document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === '평균'));
+      }
+      syncFilterControls();
+      updateFilterSummary();
+      render();
+    });
+    document.getElementById('repetitionLegend').addEventListener('click', e => {
+      const button = e.target.closest('[data-repetition]');
+      if (!button || selectedView !== 'speaker' || selectedSpeaker === 'all') return;
+      const repetition = Number(button.dataset.repetition);
+      selectedRepetition = Number(selectedRepetition) === repetition ? 'all' : repetition;
+      render();
+    });
+
+    function sharedDataEndpoint() {
+      return SHARED_DATA_API_URL.replace(/\/$/, '') + '/shared-data';
+    }
+    function mergeSharedSpeakerData(remoteRecords) {
+      const remote = normalizeData(Array.isArray(remoteRecords) ? remoteRecords : []);
+      const remoteIds = new Set(remote.map(item => item.id));
+      const localOnly = data.filter(item => !sharedRecordIds.has(item.id) && !remoteIds.has(item.id));
+      data = normalizeData([...localOnly, ...remote]);
+      sharedRecordIds = new Set(remote.map(item => item.id));
+      saveData();
+    }
+    function applySharedDataPayload(payload) {
+      mergeSharedSpeakerData(payload && payload.speakerData);
+      averageData = normalizeAverageData(averageData);
+      saveAverageData();
+      render();
+    }
+    async function loadSharedData() {
+      try {
+        const response = await fetch(sharedDataEndpoint());
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소를 읽지 못했습니다.');
+        mergeSharedSpeakerData(payload.speakerData);
+        sharedDataState = 'ready';
+        sharedDataError = '';
+        render();
+      } catch (error) {
+        sharedDataState = 'error';
+        sharedDataError = error && error.message ? error.message : '공유 데이터 저장소를 읽지 못했습니다.';
+        render();
+      }
+    }
+    async function appendSharedData(records, batchId = '') {
+      if (!protectedPanelSessionPassword) throw new Error('공유 데이터 쓰기 권한을 먼저 확인해 주세요.');
+      const safeBatchId = batchId || ('batch-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+      const response = await fetch(sharedDataEndpoint(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shared-Data-Password': protectedPanelSessionPassword },
+        body: JSON.stringify({ batchId: safeBatchId, clientRequestId: safeBatchId, speakerData: records })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소에 저장하지 못했습니다.');
+      mergeSharedSpeakerData(payload.speakerData);
+      sharedDataState = 'ready';
+      sharedDataError = '';
+      render();
+      return payload;
+    }
+    async function deleteSharedData(options = {}) {
+      if (!protectedPanelSessionPassword) throw new Error('공유 데이터 쓰기 권한을 먼저 확인해 주세요.');
+      const response = await fetch(sharedDataEndpoint(), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'X-Shared-Data-Password': protectedPanelSessionPassword },
+        body: JSON.stringify({ all: options.all === true, speakerIds: Array.isArray(options.speakerIds) ? options.speakerIds : [] })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.detail || '공유 데이터 저장소를 수정하지 못했습니다.');
+      mergeSharedSpeakerData(payload.speakerData);
+      sharedDataState = 'ready';
+      sharedDataError = '';
+      render();
+      return payload;
+    }
+
+    async function hashProtectedPanelPassword(value) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    function setProtectedPanelExpanded(config, expanded) {
+      const toggle = document.getElementById(config.toggleId);
+      const body = document.getElementById(config.bodyId);
+      const icon = document.getElementById(config.iconId);
+      toggle.setAttribute('aria-expanded', String(expanded));
+      body.hidden = !expanded;
+      icon.textContent = expanded ? '−' : '＋';
+    }
+    function closePanelPasswordModal() {
+      document.getElementById('panelPasswordModal').classList.add('hidden');
+      document.getElementById('panelPasswordInput').value = '';
+      document.getElementById('panelPasswordMessage').textContent = '비밀번호를 입력하면 해당 패널이 열립니다.';
+      pendingProtectedPanel = null;
+    }
+    function openPanelPasswordModal(config) {
+      pendingProtectedPanel = config;
+      document.getElementById('panelPasswordInput').value = '';
+      document.getElementById('panelPasswordMessage').textContent = '비밀번호를 입력하면 해당 패널이 열립니다.';
+      document.getElementById('panelPasswordModal').classList.remove('hidden');
+      document.getElementById('panelPasswordInput').focus();
+    }
+    function requestProtectedPanel(config) {
+      const toggle = document.getElementById(config.toggleId);
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      if (expanded) {
+        setProtectedPanelExpanded(config, false);
+      } else {
+        openPanelPasswordModal(config);
+      }
+    }
+    async function verifyPanelPassword() {
+      const input = document.getElementById('panelPasswordInput');
+      const message = document.getElementById('panelPasswordMessage');
+      try {
+        const hash = await hashProtectedPanelPassword(input.value);
+        if (hash !== PROTECTED_PANEL_PASSWORD_HASH) {
+          message.textContent = '비밀번호가 맞지 않습니다.';
+          input.select();
+          return;
+        }
+        protectedPanelSessionPassword = input.value;
+        const config = pendingProtectedPanel;
+        closePanelPasswordModal();
+        if (config) setProtectedPanelExpanded(config, true);
+      } catch (error) {
+        message.textContent = '비밀번호 확인을 사용할 수 없습니다. HTTPS 페이지에서 다시 시도해 주세요.';
+      }
+    }
 
     function closeDeleteConfirm() {
       document.getElementById('deleteConfirmModal').classList.add('hidden');
@@ -1240,6 +2098,19 @@
       document.getElementById('deleteConfirmModal').classList.remove('hidden');
       document.getElementById('deleteConfirmInput').focus();
     }
+    const pointFormPanelConfig = { toggleId: 'pointFormToggle', bodyId: 'pointFormBody', iconId: 'pointFormToggleIcon' };
+    const deletePanelConfig = { toggleId: 'deletePanelToggle', bodyId: 'deletePanelBody', iconId: 'deletePanelToggleIcon' };
+    document.getElementById('pointFormToggle').addEventListener('click', () => requestProtectedPanel(pointFormPanelConfig));
+    document.getElementById('deletePanelToggle').addEventListener('click', () => requestProtectedPanel(deletePanelConfig));
+    document.getElementById('panelPasswordSubmit').addEventListener('click', verifyPanelPassword);
+    document.getElementById('panelPasswordCancel').addEventListener('click', closePanelPasswordModal);
+    document.getElementById('panelPasswordModal').addEventListener('click', e => {
+      if (e.target.id === 'panelPasswordModal') closePanelPasswordModal();
+    });
+    document.getElementById('panelPasswordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') verifyPanelPassword();
+    });
+
     document.getElementById('deleteConfirmInput').addEventListener('input', e => {
       document.getElementById('deleteConfirmBtn').disabled = e.target.value !== '삭제';
     });
@@ -1254,22 +2125,28 @@
       if (e.target.id === 'deleteConfirmModal') closeDeleteConfirm();
     });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && !document.getElementById('deleteConfirmModal').classList.contains('hidden')) closeDeleteConfirm();
+      if (e.key !== 'Escape') return;
+      if (!document.getElementById('panelPasswordModal').classList.contains('hidden')) closePanelPasswordModal();
+      else if (!document.getElementById('deleteConfirmModal').classList.contains('hidden')) closeDeleteConfirm();
     });
 
-    document.getElementById('pointForm').addEventListener('submit', e => {
+    document.getElementById('pointForm').addEventListener('submit', async e => {
       e.preventDefault();
       const ageValue = document.getElementById('age').value;
       const isAverage = ageValue === 'average';
       const speakerId = document.getElementById('speakerId').value.trim();
-      const region = document.getElementById('region').value;
-      const country = region === '해외' ? document.getElementById('overseasCountry').value.trim() : '';
       const gender = document.getElementById('gender').value;
+      const averageReference = document.getElementById('averageReference').value.trim();
       const formMessage = document.getElementById('formMessage');
       formMessage.textContent = '';
       formMessage.className = 'form-message';
-      if (!isAverage && (!speakerId || !region || (region === '해외' && !country))) {
-        formMessage.textContent = region === '해외' ? '해외를 선택한 경우 국가명을 입력해 주세요.' : '화자 ID와 지역을 먼저 입력해 주세요.';
+      if (isAverage && !averageReference) {
+        formMessage.textContent = '평균값을 추가할 때 참고 논문·자료를 입력해 주세요.';
+        formMessage.classList.add('visible', 'error');
+        return;
+      }
+      if (!isAverage && !speakerId) {
+        formMessage.textContent = '화자 ID를 먼저 입력해 주세요.';
         formMessage.classList.add('visible', 'error');
         return;
       }
@@ -1303,80 +2180,73 @@
       }
       const genderLabel = gender === 'female' ? '여성' : '남성';
       const now = Date.now();
-      const duplicateVowels = [];
       if (isAverage) {
-        const newItems = entries.flatMap(({ vowel, f1, f2 }) => {
-          if (averageData.some(d => d.age === '평균' && d.gender === gender && d.vowel === vowel)) {
-            duplicateVowels.push(vowel);
-            return [];
-          }
-          return [{
-            id: 'average-평균-' + gender + '-' + vowel,
-            age: '평균',
-            gender,
-            vowel,
-            f1,
-            f2,
-            source: 'average'
-          }];
-        });
-        if (!newItems.length) {
-          formMessage.textContent = genderLabel + ' 평균의 ' + duplicateVowels.join(', ') + ' 값은 이미 있습니다. 기존 값을 유지했으며, 중복 평균값은 추가하지 않았습니다.';
-          formMessage.classList.add('visible', 'error');
-          return;
-        }
+        const seriesId = 'average-series-' + now + '-' + Math.random().toString(36).slice(2, 9);
+        const newItems = entries.map(({ vowel, f1, f2 }) => ({
+          id: seriesId + '-' + vowel,
+          age: '평균',
+          gender,
+          vowel,
+          f1,
+          f2,
+          averageReference,
+          averageSeriesId: seriesId,
+          source: 'average'
+        }));
         averageData.push(...newItems);
         saveAverageData();
+        selectedAverageSeries = seriesId;
+        selectedAge = '평균';
+        document.querySelectorAll('#ageFilter button').forEach(button => button.classList.toggle('active', button.dataset.age === '평균'));
         e.target.reset();
         document.getElementById('gender').value = 'female';
         document.getElementById('age').value = '20대';
-        updateRegionField();
         updateInputMode();
-        const duplicateNotice = duplicateVowels.length ? ' 이미 있던 ' + duplicateVowels.join(', ') + ' 값은 기존 평균값을 유지했습니다.' : '';
-        formMessage.textContent = '평균 ' + genderLabel + '의 ' + newItems.length + '개 모음값이 추가되었습니다.' + duplicateNotice;
+        formMessage.textContent = '평균 ' + genderLabel + ' · ' + averageReference + '의 ' + newItems.length + '개 모음값이 추가되었습니다. 기존 평균값과 별도 결과로 저장했습니다.';
         formMessage.classList.add('visible', 'success');
         render();
         return;
       }
-      const newItems = entries.flatMap(({ vowel, f1, f2 }, index) => {
-        if (data.some(d => d.speakerId === speakerId && d.vowel === vowel)) {
-          duplicateVowels.push(vowel);
-          return [];
-        }
-        return [{
-          id: speakerId + '-' + vowel + '-' + now + '-' + index,
-          speakerId,
-          region,
-          country,
-          nationality: document.getElementById('nationality').value.trim() || '미입력',
-          gender,
-          age: ageValue,
-          vowel,
-          f1,
-          f2,
-          source: 'manual'
-        }];
-      });
-      if (!newItems.length) {
-        formMessage.textContent = speakerId + ' ID의 ' + duplicateVowels.join(', ') + ' 값은 이미 있습니다. 기존 값을 유지했으며, 중복 값은 추가하지 않았습니다.';
+      const existingVowels = entries.filter(({ vowel }) => data.some(d => d.speakerId === speakerId && d.vowel === vowel)).map(({ vowel }) => vowel);
+      const newItems = entries.map(({ vowel, f1, f2 }, index) => ({
+        id: speakerId + '-' + vowel + '-' + now + '-' + index,
+        speakerId,
+        nationality: document.getElementById('nationality').value.trim() || '미입력',
+        gender,
+        age: ageValue,
+        vowel,
+        f1,
+        f2,
+        tokenNo: nextTokenNumber(speakerId, vowel),
+        source: 'manual'
+      }));
+      let savedPayload;
+      try {
+        savedPayload = await appendSharedData(newItems);
+      } catch (error) {
+        formMessage.textContent = '공유 저장에 실패했습니다: ' + (error.message || '알 수 없는 오류');
         formMessage.classList.add('visible', 'error');
         return;
       }
-      data.push(...newItems);
-      saveData();
       e.target.reset();
       document.getElementById('gender').value = 'female';
       document.getElementById('age').value = '20대';
-      updateRegionField();
       updateInputMode();
-      const duplicateNotice = duplicateVowels.length ? ' 이미 있던 ' + duplicateVowels.join(', ') + ' 값은 기존 값을 유지했습니다.' : '';
-      formMessage.textContent = speakerId + ' ID의 ' + newItems.length + '개 모음값이 추가되었습니다.' + duplicateNotice;
+      const repeatNotice = existingVowels.length ? ' 기존 토큰과 별도의 반복 토큰으로 저장했습니다.' : '';
+      formMessage.textContent = speakerId + ' ID의 ' + newItems.length + '개 토큰이 추가되었습니다.' + repeatNotice;
       formMessage.classList.add('visible', 'success');
       render();
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       if (!data.length && !averageData.length) return;
-      openDeleteConfirm('현재 저장된 모든 화자값과 연령대·성별 평균값을 삭제합니다.', () => {
+      openDeleteConfirm('현재 저장된 모든 화자값과 연령대·성별 평균값을 삭제합니다.', async () => {
+        try {
+          await deleteSharedData({ all: true });
+        } catch (error) {
+          document.getElementById('formMessage').textContent = '공유 삭제에 실패했습니다: ' + (error.message || '알 수 없는 오류');
+          document.getElementById('formMessage').className = 'form-message visible error';
+          return;
+        }
         data = [];
         averageData = [];
         selectedSpeaker = 'all';
@@ -1389,7 +2259,14 @@
       const id = document.getElementById('deleteSpeakerSelect').value;
       if (!id) return;
       const count = data.filter(d => d.speakerId === id).length;
-      openDeleteConfirm(`${id} 화자의 모음값 ${count}개를 삭제합니다.`, () => {
+      openDeleteConfirm(`${id} 화자의 모음값 ${count}개를 삭제합니다.`, async () => {
+        try {
+          await deleteSharedData({ speakerIds: data.filter(d => d.speakerId === id).map(d => d.id) });
+        } catch (error) {
+          document.getElementById('formMessage').textContent = '공유 삭제에 실패했습니다: ' + (error.message || '알 수 없는 오류');
+          document.getElementById('formMessage').className = 'form-message visible error';
+          return;
+        }
         data = data.filter(d => d.speakerId !== id);
         if (selectedSpeaker === id) selectedSpeaker = 'all';
         saveData();
@@ -1401,7 +2278,14 @@
       if (!id) return;
       const item = data.find(d => d.id === id);
       if (!item) return;
-      openDeleteConfirm(`${item.speakerId} ID의 ${item.vowel} 값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, () => {
+      openDeleteConfirm(`${item.speakerId} ID의 ${item.vowel} 값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, async () => {
+        try {
+          await deleteSharedData({ speakerIds: [id] });
+        } catch (error) {
+          document.getElementById('formMessage').textContent = '공유 삭제에 실패했습니다: ' + (error.message || '알 수 없는 오류');
+          document.getElementById('formMessage').className = 'form-message visible error';
+          return;
+        }
         data = data.filter(d => d.id !== id);
         saveData();
         render();
@@ -1412,7 +2296,7 @@
       if (!id) return;
       const item = averageData.find(d => d.id === id);
       if (!item) return;
-      openDeleteConfirm(`${item.age} ${item.gender === 'female' ? '여성' : '남성'}의 ${item.vowel} 평균값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, () => {
+      openDeleteConfirm(`${item.age} ${item.gender === 'female' ? '여성' : '남성'} · ${item.averageReference || '기존 평균값'}의 ${item.vowel} 평균값(F1 ${item.f1} / F2 ${item.f2} Hz)을 삭제합니다.`, async () => {
         averageData = averageData.filter(d => d.id !== id);
         saveAverageData();
         render();
@@ -1440,27 +2324,54 @@
       zoomAt(point.x, point.y, factor);
       render();
     }, { passive: false });
+    function resetDistributionSelection() {
+      if (selectedView === 'overview' && selectedVowels.length === 0 && selectedSpeaker === 'all' && selectedAverageSeries === 'all' && selectedRepetition === 'all' && !pointSelectionReturnState) return;
+      const previous = pointSelectionReturnState;
+      pointSelectionReturnState = null;
+      if (previous) {
+        selectedView = previous.selectedView;
+        selectedVowels = Array.isArray(previous.selectedVowels) ? [...previous.selectedVowels] : [];
+        selectedSpeaker = previous.selectedSpeaker;
+        selectedAverageSeries = previous.selectedAverageSeries;
+        selectedGender = previous.selectedGender;
+        selectedAge = previous.selectedAge;
+        selectedRepetition = previous.selectedRepetition || 'all';
+      } else {
+        selectedView = 'overview';
+        selectedVowels = [];
+        selectedSpeaker = 'all';
+        selectedAverageSeries = 'all';
+        selectedRepetition = 'all';
+      }
+      render();
+    }
     svg.addEventListener('pointerdown', e => {
       if (e.target.closest('.point')) return;
-      drag = { point: getSvgPoint(e), viewDomain: { ...viewDomain } };
+      drag = { point: getSvgPoint(e), viewDomain: { ...viewDomain }, moved: false, target: e.target };
       svg.setPointerCapture(e.pointerId);
       svg.style.cursor = 'grabbing';
     });
     svg.addEventListener('pointermove', e => {
       if (!drag) return;
       const point = getSvgPoint(e);
+      if (Math.abs(point.x - drag.point.x) > 3 || Math.abs(point.y - drag.point.y) > 3) drag.moved = true;
       viewDomain = { ...drag.viewDomain };
       panBy(point.x - drag.point.x, point.y - drag.point.y);
       render();
     });
-    svg.addEventListener('pointerup', () => { drag = null; svg.style.cursor = 'default'; });
+    svg.addEventListener('pointerup', () => {
+      const finishedDrag = drag;
+      drag = null;
+      svg.style.cursor = 'default';
+      if (finishedDrag && !finishedDrag.moved && !finishedDrag.target.closest('.point, .speaker-path, .speaker-node, .speaker-label')) resetDistributionSelection();
+    });
     svg.addEventListener('pointercancel', () => { drag = null; svg.style.cursor = 'default'; });
 
     renderBatchInputGrid();
     updateMicPrompt();
-    updateRegionField();
     updateInputMode();
     render();
+    loadSharedData();
   </script>
 </body>
 </html>
