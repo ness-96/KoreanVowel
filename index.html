@@ -110,6 +110,9 @@
     .speaker-node { fill: #294a89; stroke: #fff; stroke-width: 1px; font-size: 9px; font-weight: 800; text-anchor: middle; dominant-baseline: central; paint-order: stroke fill; }
     .speaker-label { fill: #294a89; font-size: 12px; font-weight: 800; }
     .point.mic-point { fill: #2f9d68; stroke: #fff; stroke-width: 1.4px; font-size: 12px; }
+
+    .point.learner-point { fill: #7656c5; stroke: #fff; stroke-width: 1.5px; font-size: 12px; font-weight: 900; }
+    .learner-label { fill: #684bb4; font-size: 10px; font-weight: 900; pointer-events: none; }
     .point.average-point { stroke: none; stroke-width: 0; stroke-dasharray: none; font-size: 11px; }
     .average-label { fill: #1f3150; font-size: 10px; font-weight: 800; pointer-events: none; }
     .mic-label { fill: #2f9d68; font-size: 11px; font-weight: 800; pointer-events: none; }
@@ -152,6 +155,7 @@
     .legend-dot.male { background: #4e7cf3; }
     .legend-dot.green { background: #2f9d68; }
     .legend-dot.average { background: #fff; border: 2px dashed #1f3150; }
+    .legend-dot.learner { background: #7656c5; }
     .status-pill { margin-left: auto; color: #4e6a92; background: #edf4ff; padding: 6px 9px; border-radius: 8px; }
 
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
@@ -279,6 +283,27 @@
     .zone-swatch.male-zone { color: #67b9ef; background: rgba(128, 207, 255, .28); }
     .zone-swatch.female-zone { color: #ea94aa; background: rgba(247, 176, 194, .28); }
     .reference-zone-note { margin-top: 8px; color: #8995a6; font-size: 10px; line-height: 1.5; }
+
+    .learner-utterance-panel { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .learner-utterance-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .learner-utterance-head strong { color: var(--navy); font-size: 11px; }
+    .learner-utterance-status { color: #8995a6; font-size: 10px; font-weight: 800; }
+    .learner-utterance-note { margin-top: 6px; color: #8995a6; font-size: 10px; line-height: 1.45; }
+    .learner-utterance-table { width: 100%; margin-top: 8px; border-collapse: collapse; table-layout: fixed; }
+    .learner-utterance-table th, .learner-utterance-table td { padding: 5px 4px; border-top: 1px solid #edf0f4; text-align: right; color: #60718a; font-size: 10px; }
+    .learner-utterance-table th:first-child, .learner-utterance-table td:first-child { width: 22%; text-align: left; }
+    .learner-utterance-table th:last-child, .learner-utterance-table td:last-child { width: 29%; }
+    .learner-utterance-table thead th { border-top: 0; color: #8995a6; font-size: 9px; font-weight: 800; }
+    .learner-utterance-table tbody th { color: #684bb4; font-weight: 900; }
+    .learner-utterance-table tbody tr.recorded td { color: var(--navy); font-weight: 800; }
+    .learner-utterance-table tbody tr.outside td:last-child { color: #a86b27; }
+    .learner-utterance-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; margin-top: 8px; }
+    .learner-utterance-actions button { margin-top: 0; padding: 8px 9px; font-size: 10px; }
+    .learner-utterance-actions button:disabled { cursor: not-allowed; opacity: .48; }
+    .mic-feedback { margin-top: 8px; padding: 9px 10px; border: 1px solid #dbe6f8; border-radius: 10px; background: #f4f7ff; color: #304b7a; font-size: 11px; font-weight: 700; line-height: 1.5; }
+    .mic-feedback.inside { border-color: #c9ead7; background: #f1faf5; color: #35624d; }
+    .mic-feedback.guide { border-color: #f0d7b0; background: #fff8ed; color: #8a5a21; }
+    .mic-feedback.idle { border-color: #e5e9ef; background: #f7f9fc; color: #718096; font-weight: 600; }
     .reference-zone-relation { margin-top: 7px; color: #60718a; font-size: 10px; line-height: 1.5; }
     .mic-formant-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
     .mic-formant-value { padding: 10px 12px; border: 1px solid #edf0f4; border-radius: 10px; background: #f7f9fc; }
@@ -396,7 +421,8 @@
         <div class="legend">
           <span class="legend-item"><span class="legend-dot red"></span>여성</span>
           <span class="legend-item"><span class="legend-dot male"></span>남성</span>
-          <span class="legend-item"><span class="legend-dot green"></span>내 발음(Praat 서버)</span>
+          <span class="legend-item"><span class="legend-dot green"></span>현재 발음(Praat 서버)</span>
+          <span class="legend-item"><span class="legend-dot learner"></span>내 발화 기록 1·2·3회</span>
           <span class="legend-item"><span class="legend-dot average"></span>연령대·성별 평균</span>
           <span class="status-pill" id="dataStatus">데이터 없음</span>
           <span class="repeat-legend hidden" id="repetitionLegend">
@@ -448,6 +474,22 @@
             <div class="mic-formant-value"><span>F1 · 서버 측정</span><strong id="micF1Value">—</strong><small>Hz</small></div>
             <div class="mic-formant-value"><span>F2 · 서버 측정</span><strong id="micF2Value">—</strong><small>Hz</small></div>
           </div>
+          <section class="learner-utterance-panel" id="learnerUtterancePanel" aria-live="polite">
+            <div class="learner-utterance-head"><strong>내 발화 기록</strong><span class="learner-utterance-status" id="learnerUtteranceStatus">0/3회</span></div>
+            <div class="learner-utterance-note">안정된 측정값이 표시되면 현재 발화를 다음 회차로 기록하세요.</div>
+            <table class="learner-utterance-table">
+              <thead><tr><th>회차</th><th>F1</th><th>F2</th><th>상태</th></tr></thead>
+              <tbody id="learnerUtteranceBody">
+                <tr data-learner-repetition="1"><th>1회</th><td>—</td><td>—</td><td>대기</td></tr>
+                <tr data-learner-repetition="2"><th>2회</th><td>—</td><td>—</td><td>대기</td></tr>
+                <tr data-learner-repetition="3"><th>3회</th><td>—</td><td>—</td><td>대기</td></tr>
+              </tbody>
+            </table>
+            <div class="learner-utterance-actions">
+              <button class="submit-button" type="button" id="recordLearnerUtteranceBtn" disabled>현재 발화 기록</button>
+              <button class="secondary-button" type="button" id="clearLearnerUtterancesBtn" disabled>기록 지우기</button>
+            </div>
+          </section>
           <div class="reference-zone-panel" id="referenceZonePanel">
             <div class="reference-zone-head"><strong>관찰 범위</strong><span class="reference-zone-status" id="referenceZoneStatus">마이크 대기</span></div>
             <div class="reference-zone-controls">
@@ -456,7 +498,7 @@
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneFemaleToggle" checked /><span class="zone-swatch female-zone"></span>여성</label>
             </div>
             <div class="reference-zone-relation" id="micReferenceRelation">현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
-            <div class="reference-zone-note" id="referenceZoneNote">선택한 모음의 공유 원자료 전체값을 포함하는 타원형 폐곡선입니다. 모음을 바꾸면 해당 모음 전체값으로 다시 계산합니다. 원자료가 없으면 출처별 평균값을 임시로 사용하며, 정답·오류 판정이 아닙니다.</div>
+            <div class="mic-feedback idle" id="micFeedback" aria-live="polite">마이크를 켜고 안정된 발화를 만들면 피드백이 표시됩니다.</div>
           </div>
           <div class="mic-spectrum-panel">
             <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
@@ -657,6 +699,7 @@
     let zoom = { scale: 1, tx: 0, ty: 0 };
     let drag = null;
     let micPoint = null;
+    let learnerUtterances = [];
     let referenceZoneVisible = true;
     let referenceZoneMaleVisible = true;
     let referenceZoneFemaleVisible = true;
@@ -692,6 +735,11 @@
     const micSpectrumNote = document.getElementById('micSpectrumNote');
     const micF1Value = document.getElementById('micF1Value');
     const micF2Value = document.getElementById('micF2Value');
+    const learnerUtteranceBody = document.getElementById('learnerUtteranceBody');
+    const learnerUtteranceStatus = document.getElementById('learnerUtteranceStatus');
+    const recordLearnerUtteranceBtn = document.getElementById('recordLearnerUtteranceBtn');
+    const clearLearnerUtterancesBtn = document.getElementById('clearLearnerUtterancesBtn');
+    const micFeedback = document.getElementById('micFeedback');
     const micToggleBtn = document.getElementById('micToggleBtn');
     const micLiveIndicator = document.getElementById('micLiveIndicator');
     const tooltip = document.getElementById('tooltip');
@@ -1114,6 +1162,81 @@
             : '마이크 측정값이 생기면 관찰 범위와의 위치 관계를 차트에 표시합니다.';
       }
     }
+    function referencePointInsideHull(point, hull) {
+      let inside = false;
+      for (let index = 0, previous = hull.length - 1; index < hull.length; previous = index++) {
+        const current = hull[index];
+        const prior = hull[previous];
+        const crosses = ((current.y > point.y) !== (prior.y > point.y)) && point.x < (prior.x - current.x) * (point.y - current.y) / (prior.y - current.y) + current.x;
+        if (crosses) inside = !inside;
+      }
+      return inside;
+    }
+    function visibleReferenceZones(vowel) {
+      const genders = [];
+      if (referenceZoneMaleVisible) genders.push('male');
+      if (referenceZoneFemaleVisible) genders.push('female');
+      return genders.map(gender => getReferenceZone(vowel, gender)).filter(Boolean);
+    }
+    function getMicFeedback(point, vowelOverride = '') {
+      const selectedMicVowel = vowelOverride || document.getElementById('micVowel')?.value;
+      if (!point || !selectedMicVowel || point.vowel !== selectedMicVowel || !Number.isFinite(Number(point.f1)) || !Number.isFinite(Number(point.f2))) {
+        return { kind: 'idle', text: '마이크를 켜고 안정된 발화를 만들면 피드백이 표시됩니다.' };
+      }
+      const zones = visibleReferenceZones(selectedMicVowel);
+      if (!zones.length) return { kind: 'idle', text: '선택한 모음의 관찰 범위를 계산할 자료가 없습니다.' };
+      const pointPx = { x: xScale(Number(point.f2)), y: yScale(Number(point.f1)) };
+      if (zones.some(zone => referencePointInsideHull(pointPx, zone.hull))) return { kind: 'inside', text: '관찰 범위 안에서 발화했습니다.' };
+      const nearest = zones.map(zone => {
+        const target = referenceClosestPointOnHull(pointPx.x, pointPx.y, zone.hull);
+        return { target, distance: (target.x - pointPx.x) ** 2 + (target.y - pointPx.y) ** 2 };
+      }).sort((a, b) => a.distance - b.distance)[0];
+      const messages = [];
+      if (pointPx.y > nearest.target.y + 4) messages.push('입을 조금만 더 닫으세요.');
+      else if (pointPx.y < nearest.target.y - 4) messages.push('입을 조금만 벌리세요.');
+      if (pointPx.x < nearest.target.x - 4) messages.push('혀를 조금만 뒤로 당기세요.');
+      else if (pointPx.x > nearest.target.x + 4) messages.push('혀를 조금만 앞으로 당기세요.');
+      return { kind: 'guide', text: messages.length ? messages.join(' ') : '관찰 범위 가까이에서 발화했습니다.' };
+    }
+    function renderLearnerUtterancePanel() {
+      const records = Array.isArray(learnerUtterances) ? learnerUtterances : [];
+      if (learnerUtteranceStatus) learnerUtteranceStatus.textContent = records.length + '/3회';
+      if (learnerUtteranceBody) {
+        learnerUtteranceBody.innerHTML = [1, 2, 3].map(repetition => {
+          const record = records.find(item => Number(item.tokenNo) === repetition);
+          if (!record) return '<tr data-learner-repetition="' + repetition + '"><th>' + repetition + '회</th><td>—</td><td>—</td><td>대기</td></tr>';
+          const status = record.feedbackKind === 'inside' ? '범위 안' : '안내';
+          const rowClass = record.feedbackKind === 'inside' ? 'recorded' : 'recorded outside';
+          return '<tr class="' + rowClass + '" data-learner-repetition="' + repetition + '"><th>' + repetition + '회</th><td>' + Math.round(Number(record.f1)) + '</td><td>' + Math.round(Number(record.f2)) + '</td><td>' + status + '</td></tr>';
+        }).join('');
+      }
+      if (recordLearnerUtteranceBtn) {
+        const canRecord = Boolean(micPoint && learnerUtterances.length < 3 && micPoint.vowel === document.getElementById('micVowel')?.value && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)));
+        recordLearnerUtteranceBtn.disabled = !canRecord;
+        recordLearnerUtteranceBtn.textContent = learnerUtterances.length >= 3 ? '3회 기록 완료' : (learnerUtterances.length + 1) + '회로 기록';
+      }
+      if (clearLearnerUtterancesBtn) clearLearnerUtterancesBtn.disabled = records.length === 0;
+      updateMicFeedback(micPoint);
+    }
+    function updateMicFeedback(point) {
+      if (!micFeedback) return;
+      const feedback = getMicFeedback(point);
+      micFeedback.className = 'mic-feedback ' + feedback.kind;
+      micFeedback.textContent = feedback.text;
+    }
+    function recordCurrentLearnerUtterance() {
+      if (!micPoint || learnerUtterances.length >= 3) return;
+      const vowel = document.getElementById('micVowel')?.value;
+      if (!vowel || micPoint.vowel !== vowel || !Number.isFinite(Number(micPoint.f1)) || !Number.isFinite(Number(micPoint.f2))) return;
+      const feedback = getMicFeedback(micPoint, vowel);
+      const repetition = learnerUtterances.length + 1;
+      learnerUtterances = [...learnerUtterances, { ...micPoint, id: 'learner-' + Date.now() + '-' + repetition, speakerId: '학습자', age: '학습자', tokenNo: repetition, source: 'learner', feedbackKind: feedback.kind, feedbackText: feedback.text }];
+      render();
+    }
+    function clearLearnerUtterances() {
+      learnerUtterances = [];
+      render();
+    }
     function matchesSelectedAge(d) {
       if (selectedAge === 'all') return true;
       if (selectedAge === 'average') return d.age === '평균' || d.age === 'average' || isLegacyAverageSpeaker(d);
@@ -1286,13 +1409,14 @@
     function pointOpacity(d) {
       if (selectedView === 'vowel') return hasSelectedVowels() ? (isVowelSelected(d.vowel) ? 1 : 0) : 0.28;
       if (hasSelectedVowels()) return isVowelSelected(d.vowel) ? 1 : 0.28;
-      if (d.source === 'microphone') return 1;
+      if (d.source === 'microphone' || d.source === 'learner') return 1;
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 0.16;
       if (selectedGender === 'all') return 0.82;
       return d.gender === selectedGender ? 0.94 : 0.16;
     }
     function pointColorClass(d) {
       if (d.source === 'microphone') return 'mic-point';
+      if (d.source === 'learner') return 'learner-point';
       if (hasSelectedVowels() && !isVowelSelected(d.vowel)) return 'muted-point';
       if (selectedAge !== 'all' && !matchesSelectedAge(d)) return 'muted-point';
       return d.gender === 'female' ? 'female' : d.gender === 'male' ? 'male' : 'other';
@@ -1363,12 +1487,13 @@
         return `<text class='point vowel-point ${pointColorClass(d)}${selectedClass}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='${fontSize}' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`;
       }).join('');
       const averagePoints = visibleAverages.map(d => `<text class='point vowel-point average-point ${pointColorClass(d)}' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='11' opacity='${pointOpacity(d)}' data-id='${esc(d.id)}' data-average='true' data-vowel='${esc(d.vowel)}' aria-label='${esc(d.vowel)}'>${esc(d.vowel)}</text>`).join('');
-      const micMarkup = micPoint ? `<text class='point vowel-point ${pointColorClass(micPoint)} mic-point' x='${xScale(micPoint.f2)}' y='${yScale(micPoint.f1)}' font-size='12' opacity='1' data-id='${esc(micPoint.id)}' data-vowel='${esc(micPoint.vowel)}' aria-label='${esc(micPoint.vowel)}'>${esc(micPoint.vowel)}</text><text class='mic-label' x='${xScale(micPoint.f2)+11}' y='${yScale(micPoint.f1)-11}'>내 발음</text>` : '';
-      layer.innerHTML = corpusPoints + averagePoints + micMarkup;
+      const learnerMarkup = learnerUtterances.map(d => `<text class='point vowel-point learner-point' x='${xScale(d.f2)}' y='${yScale(d.f1)}' font-size='12' opacity='1' data-id='${esc(d.id)}' data-vowel='${esc(d.vowel)}' aria-label='내 발음 ${d.tokenNo}회'>${d.tokenNo}</text><text class='learner-label' x='${xScale(d.f2)+9}' y='${yScale(d.f1)-9}'>${d.tokenNo}회</text>`).join('');
+      const micMarkup = micPoint ? `<text class='point vowel-point ${pointColorClass(micPoint)} mic-point' x='${xScale(micPoint.f2)}' y='${yScale(micPoint.f1)}' font-size='12' opacity='1' data-id='${esc(micPoint.id)}' data-vowel='${esc(micPoint.vowel)}' aria-label='현재 ${esc(micPoint.vowel)}'>${esc(micPoint.vowel)}</text><text class='mic-label' x='${xScale(micPoint.f2)+11}' y='${yScale(micPoint.f1)-11}'>현재</text>` : '';
+      layer.innerHTML = corpusPoints + averagePoints + learnerMarkup + micMarkup;
       layer.querySelectorAll('.point').forEach(point => {
         const d = point.dataset.average
           ? averageDisplayData().find(item => item.id === point.dataset.id)
-          : micPoint && point.dataset.id === micPoint.id ? micPoint : data.find(item => item.id === point.dataset.id);
+          : micPoint && point.dataset.id === micPoint.id ? micPoint : learnerUtterances.find(item => item.id === point.dataset.id) || data.find(item => item.id === point.dataset.id);
         if (!d) return;
         point.addEventListener('mouseenter', e => showTooltip(e, d));
         point.addEventListener('mousemove', e => moveTooltip(e));
@@ -1393,6 +1518,7 @@
       syncRepetitionLegend();
       applyZoom();
       updateStats(visible.length, visibleAverages.length);
+      renderLearnerUtterancePanel();
     }
     function applyZoom() {
       plotContent.removeAttribute('transform');
@@ -1402,20 +1528,25 @@
     function showTooltip(e, d) {
       if (!d) return;
       const isMic = d.source === 'microphone';
+      const isLearnerRecord = d.source === 'learner';
       const isAverage = d.source === 'average';
       const genderLabel = d.gender === 'female' ? '여성' : d.gender === 'male' ? '남성' : '기타';
       const reference = d.averageReference || d.reference || '기존 평균값';
-      const title = isAverage
-        ? (d.age === '평균' ? '' : d.age + ' ') + genderLabel + ' 평균 · ' + d.vowel + ' · ' + reference
-        : d.vowel + ' · ' + d.speakerId + ' · ' + (d.tokenNo || 1) + '회';
+      const title = isLearnerRecord
+        ? '내 발음 · ' + d.vowel + ' · ' + (d.tokenNo || 1) + '회'
+        : isAverage
+          ? (d.age === '평균' ? '' : d.age + ' ') + genderLabel + ' 평균 · ' + d.vowel + ' · ' + reference
+          : d.vowel + ' · ' + d.speakerId + ' · ' + (d.tokenNo || 1) + '회';
       const locationDetails = d.region || d.country
         ? d.region === '해외'
           ? '<div class="tooltip-row"><span>지역</span><b>해외</b></div><div class="tooltip-row"><span>국가</span><b>' + esc(d.country || '미입력') + '</b></div>'
           : '<div class="tooltip-row"><span>지역</span><b>' + esc(locationLabel(d)) + '</b></div>'
         : '';
-      const details = isMic
-        ? '<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>' + esc(d.vowel) + '</b></div>'
-        : isAverage
+      const details = isLearnerRecord
+        ? '<div class="tooltip-row"><span>자료</span><b>학습자 발화 기록</b></div><div class="tooltip-row"><span>회차</span><b>' + (d.tokenNo || 1) + '회</b></div><div class="tooltip-row"><span>피드백</span><b>' + esc(d.feedbackText || '') + '</b></div>'
+        : isMic
+          ? '<div class="tooltip-row"><span>자료</span><b>Praat 서버 분석</b></div><div class="tooltip-row"><span>표적 모음</span><b>' + esc(d.vowel) + '</b></div>'
+          : isAverage
           ? '<div class="tooltip-row"><span>자료</span><b>연령대·성별 평균</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>참고 논문·자료</span><b>' + esc(reference) + '</b></div>'
           : '<div class="tooltip-row"><span>반복 토큰</span><b>' + (d.tokenNo || 1) + '회</b></div><div class="tooltip-row"><span>성별</span><b>' + genderLabel + '</b></div><div class="tooltip-row"><span>연령대</span><b>' + esc(d.age) + '</b></div><div class="tooltip-row"><span>국적</span><b>' + esc(d.nationality || '미입력') + '</b></div>' + locationDetails;
       tooltip.innerHTML = '<div class="tooltip-title">' + esc(title) + '</div>' + details + '<div class="tooltip-row"><span>F1 / F2</span><b>' + d.f1 + ' / ' + d.f2 + ' Hz</b></div>';
@@ -1937,6 +2068,7 @@
       micContinuousGeneration += 1;
       micLastLiveError = '';
       micPoint = null;
+      learnerUtterances = [];
       micServerFormants = null;
       setMicFormantReadout(null);
       drawMicSpectrum(micSpectrumSnapshot, null);
@@ -1947,6 +2079,8 @@
     document.getElementById('micVowel').addEventListener('change', resetMicAnalysisForVowelChange);
     document.getElementById('age').addEventListener('change', updateInputMode);
     document.getElementById('micToggleBtn').addEventListener('click', toggleContinuousMic);
+    document.getElementById('recordLearnerUtteranceBtn').addEventListener('click', recordCurrentLearnerUtterance);
+    document.getElementById('clearLearnerUtterancesBtn').addEventListener('click', clearLearnerUtterances);
     document.getElementById('referenceZoneToggle').addEventListener('change', e => {
       referenceZoneVisible = e.target.checked;
       render();
