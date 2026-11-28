@@ -456,7 +456,7 @@
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneFemaleToggle" checked /><span class="zone-swatch female-zone"></span>여성</label>
             </div>
             <div class="reference-zone-relation" id="micReferenceRelation">현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
-            <div class="reference-zone-note" id="referenceZoneNote">각 모음의 공유 원자료 전체값을 포함하는 폐곡선입니다. 원자료가 없으면 출처별 평균값을 임시로 사용합니다. 자연발화와 단독 모음 조건이 다를 수 있으며, 정답·오류 판정이 아닙니다.</div>
+            <div class="reference-zone-note" id="referenceZoneNote">선택한 모음의 공유 원자료 전체값을 포함하는 타원형 폐곡선입니다. 모음을 바꾸면 해당 모음 전체값으로 다시 계산합니다. 원자료가 없으면 출처별 평균값을 임시로 사용하며, 정답·오류 판정이 아닙니다.</div>
           </div>
           <div class="mic-spectrum-panel">
             <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
@@ -1075,7 +1075,7 @@
       const genders = [];
       if (referenceZoneMaleVisible) genders.push('male');
       if (referenceZoneFemaleVisible) genders.push('female');
-      const zones = VOWELS.flatMap(vowel => genders.map(gender => getReferenceZone(vowel, gender)).filter(Boolean));
+      const zones = genders.map(gender => getReferenceZone(selectedMicVowel, gender)).filter(Boolean);
       if (!zones.length) return;
       const micReady = micPoint && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)) && micPoint.vowel === selectedMicVowel;
       const micX = micReady ? xScale(Number(micPoint.f2)) : null;
