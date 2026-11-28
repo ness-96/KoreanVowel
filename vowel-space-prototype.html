@@ -275,10 +275,6 @@
     .reference-zone-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 9px; }
     .reference-zone-control { display: inline-flex; align-items: center; gap: 5px; color: #60718a; font-size: 10px; font-weight: 700; }
     .reference-zone-control input { accent-color: #506d9f; }
-    .reference-zone-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 11px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #edf0f4; }
-    .reference-zone-mode-title { color: #718096; font-size: 10px; font-weight: 800; }
-    .reference-zone-mode-control { display: inline-flex; align-items: center; gap: 4px; color: #60718a; font-size: 10px; font-weight: 700; }
-    .reference-zone-mode-control input { accent-color: #506d9f; }
     .zone-swatch { display: inline-block; width: 13px; height: 8px; border-radius: 3px; border: 1px solid currentColor; }
     .zone-swatch.male-zone { color: #67b9ef; background: rgba(128, 207, 255, .28); }
     .zone-swatch.female-zone { color: #ea94aa; background: rgba(247, 176, 194, .28); }
@@ -459,13 +455,8 @@
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneMaleToggle" checked /><span class="zone-swatch male-zone"></span>남성</label>
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneFemaleToggle" checked /><span class="zone-swatch female-zone"></span>여성</label>
             </div>
-            <div class="reference-zone-mode" role="group" aria-label="관찰 범위 기준">
-              <span class="reference-zone-mode-title">범위 기준</span>
-              <label class="reference-zone-mode-control"><input type="radio" name="referenceZoneMode" id="referenceZoneMinMaxMode" value="minmax" checked />최솟값·최댓값</label>
-              <label class="reference-zone-mode-control"><input type="radio" name="referenceZoneMode" id="referenceZonePcaMode" value="pca" />PCA 방향 요약 타원</label>
-            </div>
             <div class="reference-zone-relation" id="micReferenceRelation">현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
-            <div class="reference-zone-note" id="referenceZoneNote">기본은 선택한 모음의 F1·F2 최솟값·최댓값을 모두 포함하는 관찰 범위입니다. PCA 방향 요약 타원은 보조 보기이며, 최솟값·최댓값 기준과 다를 수 있습니다. 원자료가 없으면 출처별 평균값을 임시로 사용합니다.</div>
+            <div class="reference-zone-note" id="referenceZoneNote">선택한 모음의 공유 원자료 전체값을 포함하는 타원형 폐곡선입니다. 모음을 바꾸면 해당 모음 전체값으로 다시 계산합니다. 원자료가 없으면 출처별 평균값을 임시로 사용하며, 정답·오류 판정이 아닙니다.</div>
           </div>
           <div class="mic-spectrum-panel">
             <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
@@ -669,7 +660,6 @@
     let referenceZoneVisible = true;
     let referenceZoneMaleVisible = true;
     let referenceZoneFemaleVisible = true;
-    let referenceZoneMode = 'minmax';
     let micStream = null;
     let micAudioContext = null;
     let micAnalyser = null;
@@ -939,6 +929,27 @@
         .filter(d => !explicitKeys.has(averageEntryKey(d)));
       return [...explicit, ...legacy];
     }
+    function referencePointSort(a, b) {
+      return a.x - b.x || a.y - b.y;
+    }
+    function referenceCross(a, b, c) {
+      return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    }
+    function referenceConvexHull(points) {
+      const unique = [...new Map(points.map(point => [point.x.toFixed(4) + '|' + point.y.toFixed(4), point])).values()].sort(referencePointSort);
+      if (unique.length <= 2) return unique;
+      const lower = [];
+      unique.forEach(point => {
+        while (lower.length >= 2 && referenceCross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop();
+        lower.push(point);
+      });
+      const upper = [];
+      [...unique].reverse().forEach(point => {
+        while (upper.length >= 2 && referenceCross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop();
+        upper.push(point);
+      });
+      return lower.slice(0, -1).concat(upper.slice(0, -1));
+    }
     function referenceEllipsePoints(cx, cy, rx, ry, angle, count = 20) {
       return Array.from({ length: count }, (_, index) => {
         const theta = (Math.PI * 2 * index) / count;
@@ -947,15 +958,24 @@
         return { x: cx + cos * rx * Math.cos(angle) - sin * ry * Math.sin(angle), y: cy + cos * rx * Math.sin(angle) + sin * ry * Math.cos(angle) };
       });
     }
-    function referenceMinMaxBoundary(points) {
-      if (!points.length) return [];
-      let minX = Math.min(...points.map(point => point.x));
-      let maxX = Math.max(...points.map(point => point.x));
-      let minY = Math.min(...points.map(point => point.y));
-      let maxY = Math.max(...points.map(point => point.y));
-      if (maxX - minX < 1) { minX -= 12; maxX += 12; }
-      if (maxY - minY < 1) { minY -= 12; maxY += 12; }
-      return [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+    function referenceExpandHull(points, padding = 12) {
+      if (points.length === 0) return [];
+      if (points.length === 1) return referenceEllipsePoints(points[0].x, points[0].y, padding, padding, 0);
+      if (points.length === 2) {
+        const centerX = (points[0].x + points[1].x) / 2;
+        const centerY = (points[0].y + points[1].y) / 2;
+        const dx = points[1].x - points[0].x;
+        const dy = points[1].y - points[0].y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return referenceEllipsePoints(centerX, centerY, length / 2 + padding, padding, Math.atan2(dy, dx), 24);
+      }
+      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 });
+      return points.map(point => {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return { x: point.x + dx / length * padding, y: point.y + dy / length * padding };
+      });
     }
     function referenceClosestPointOnSegment(px, py, a, b) {
       const dx = b.x - a.x;
@@ -964,7 +984,7 @@
       const t = lengthSquared ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lengthSquared)) : 0;
       return { x: a.x + t * dx, y: a.y + t * dy };
     }
-    function referenceClosestPointOnBoundary(px, py, points) {
+    function referenceClosestPointOnHull(px, py, points) {
       if (!points.length) return null;
       let closest = points[0];
       let closestDistance = Infinity;
@@ -1025,7 +1045,7 @@
       const values = rawValues.length ? rawValues : averageValues;
       if (!values.length) return null;
       const pixelValues = values.map(item => ({ x: xScale(item.f2), y: yScale(item.f1) }));
-      return { gender, vowel, source: rawValues.length ? 'shared' : 'average', valueCount: values.length, minMax: referenceMinMaxBoundary(pixelValues), pca: referenceEnclosingEllipse(pixelValues, rawValues.length ? 12 : 18) };
+      return { gender, vowel, source: rawValues.length ? 'shared' : 'average', valueCount: values.length, hull: referenceEnclosingEllipse(pixelValues, rawValues.length ? 12 : 18) };
     }
     function syncReferenceZoneControls() {
       const active = Boolean(micStream || micPoint);
@@ -1034,21 +1054,16 @@
       const master = document.getElementById('referenceZoneToggle');
       const male = document.getElementById('referenceZoneMaleToggle');
       const female = document.getElementById('referenceZoneFemaleToggle');
-      const minMaxMode = document.getElementById('referenceZoneMinMaxMode');
-      const pcaMode = document.getElementById('referenceZonePcaMode');
-      const modeLabel = referenceZoneMode === 'pca' ? 'PCA 방향 요약 타원' : '최솟값·최댓값 범위';
       if (master) master.checked = referenceZoneVisible;
       if (male) male.checked = referenceZoneMaleVisible;
       if (female) female.checked = referenceZoneFemaleVisible;
-      if (minMaxMode) minMaxMode.checked = referenceZoneMode === 'minmax';
-      if (pcaMode) pcaMode.checked = referenceZoneMode === 'pca';
       if (status) status.textContent = active ? '측정값 표시 중' : '마이크 대기';
       if (relation) {
         relation.textContent = !referenceZoneVisible
           ? '관찰 범위 표시가 꺼져 있습니다.'
           : active
-            ? modeLabel + ' 기준으로 현재 선택 모음의 측정값과 범위 사이를 점선으로 표시합니다.'
-            : '마이크 측정값이 생기면 선택한 기준으로 관찰 범위와 위치 관계를 표시합니다.';
+            ? '현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트의 점선으로 표시합니다.'
+            : '마이크 측정값이 생기면 모음별 관찰 범위와 위치 관계를 차트에 표시합니다.';
       }
     }
     function drawReferenceZones() {
@@ -1065,22 +1080,39 @@
       const micReady = micPoint && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)) && micPoint.vowel === selectedMicVowel;
       const micX = micReady ? xScale(Number(micPoint.f2)) : null;
       const micY = micReady ? yScale(Number(micPoint.f1)) : null;
-      const modeLabel = referenceZoneMode === 'pca' ? 'PCA 방향 요약 타원' : '최솟값·최댓값 범위';
       const markup = zones.map(zone => {
         const className = zone.gender === 'male' ? 'male-zone' : 'female-zone';
-        const modeClass = referenceZoneMode === 'pca' ? 'pca-zone' : 'minmax-zone';
         const label = zone.vowel + ' · ' + (zone.gender === 'male' ? '남성' : '여성');
-        const boundary = referenceZoneMode === 'pca' ? zone.pca : zone.minMax;
-        const minX = Math.min(...boundary.map(point => point.x));
-        const minY = Math.min(...boundary.map(point => point.y));
-        const lineTarget = micReady ? referenceClosestPointOnBoundary(micX, micY, boundary) : null;
+        const minX = Math.min(...zone.hull.map(point => point.x));
+        const minY = Math.min(...zone.hull.map(point => point.y));
+        const selected = zone.vowel === selectedMicVowel;
+        const lineTarget = micReady && selected ? referenceClosestPointOnHull(micX, micY, zone.hull) : null;
         const line = lineTarget && (Math.abs(lineTarget.x - micX) > 1 || Math.abs(lineTarget.y - micY) > 1)
           ? '<line class="reference-zone-distance ' + className + '" x1="' + micX + '" y1="' + micY + '" x2="' + lineTarget.x + '" y2="' + lineTarget.y + '" />'
           : '';
         const targetDot = lineTarget ? '<circle class="reference-zone-distance-dot ' + className + '" cx="' + lineTarget.x + '" cy="' + lineTarget.y + '" r="3" />' : '';
-        return '<path class="reference-zone ' + className + ' ' + modeClass + '" d="' + referencePolygonPath(boundary) + '" aria-label="' + label + ' · ' + modeLabel + ' 관찰 범위" />' + line + targetDot + '<text class="reference-zone-label ' + className + '" x="' + (minX + 8) + '" y="' + (minY + 16) + '">' + label + '</text>';
+        return '<path class="reference-zone ' + className + '" d="' + referencePolygonPath(zone.hull) + '" aria-label="' + label + ' 관찰 범위" />' + line + targetDot + '<text class="reference-zone-label ' + className + '" x="' + (minX + 8) + '" y="' + (minY + 16) + '">' + label + '</text>';
       }).join('');
       layer.innerHTML = markup;
+    }
+    function syncReferenceZoneControls() {
+      const active = Boolean(micStream || micPoint);
+      const status = document.getElementById('referenceZoneStatus');
+      const relation = document.getElementById('micReferenceRelation');
+      const master = document.getElementById('referenceZoneToggle');
+      const male = document.getElementById('referenceZoneMaleToggle');
+      const female = document.getElementById('referenceZoneFemaleToggle');
+      if (master) master.checked = referenceZoneVisible;
+      if (male) male.checked = referenceZoneMaleVisible;
+      if (female) female.checked = referenceZoneFemaleVisible;
+      if (status) status.textContent = active ? '측정값 표시 중' : '마이크 대기';
+      if (relation) {
+        relation.textContent = !referenceZoneVisible
+          ? '관찰 범위 표시가 꺼져 있습니다.'
+          : active
+            ? '현재 측정값과 각 관찰 범위의 위치 관계를 차트의 점선으로 표시합니다.'
+            : '마이크 측정값이 생기면 관찰 범위와의 위치 관계를 차트에 표시합니다.';
+      }
     }
     function matchesSelectedAge(d) {
       if (selectedAge === 'all') return true;
@@ -1927,10 +1959,6 @@
       referenceZoneFemaleVisible = e.target.checked;
       render();
     });
-    document.querySelectorAll('input[name="referenceZoneMode"]').forEach(input => input.addEventListener('change', e => {
-      referenceZoneMode = e.target.value === 'pca' ? 'pca' : 'minmax';
-      render();
-    }));
     window.addEventListener('beforeunload', () => { if (micStream) pauseContinuousMic(); });
     window.addEventListener('resize', () => drawMicSpectrum(micSpectrumSnapshot, micServerFormants));
     const filterToggle = document.getElementById('filterToggle');
