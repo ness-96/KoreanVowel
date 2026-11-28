@@ -113,7 +113,7 @@
     .point.average-point { stroke: none; stroke-width: 0; stroke-dasharray: none; font-size: 11px; }
     .average-label { fill: #1f3150; font-size: 10px; font-weight: 800; pointer-events: none; }
     .mic-label { fill: #2f9d68; font-size: 11px; font-weight: 800; pointer-events: none; }
-    .reference-zone { stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+    .reference-zone { stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linejoin: round; pointer-events: none; }
     .reference-zone.male-zone { fill: #9ed9ff; fill-opacity: .2; stroke: #72c4f3; }
     .reference-zone.female-zone { fill: #f7b7c8; fill-opacity: .2; stroke: #eb99ae; }
     .reference-zone-label { font-size: 10px; font-weight: 800; pointer-events: none; }
@@ -455,8 +455,8 @@
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneMaleToggle" checked /><span class="zone-swatch male-zone"></span>남성</label>
               <label class="reference-zone-control"><input type="checkbox" id="referenceZoneFemaleToggle" checked /><span class="zone-swatch female-zone"></span>여성</label>
             </div>
-            <div class="reference-zone-relation" id="micReferenceRelation">마이크 측정값과 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
-            <div class="reference-zone-note" id="referenceZoneNote">기준 평균 출처 사이의 시각화용 관찰 범위입니다. 자연발화와 단독 모음 조건이 다를 수 있으며, 정답·오류 판정이 아닙니다.</div>
+            <div class="reference-zone-relation" id="micReferenceRelation">현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트에 점선으로 표시합니다.</div>
+            <div class="reference-zone-note" id="referenceZoneNote">각 모음의 공유 원자료 전체값을 포함하는 폐곡선입니다. 원자료가 없으면 출처별 평균값을 임시로 사용합니다. 자연발화와 단독 모음 조건이 다를 수 있으며, 정답·오류 판정이 아닙니다.</div>
           </div>
           <div class="mic-spectrum-panel">
             <div class="mic-spectrum-head"><span>Frequency spectrum</span><span>녹음 신호 · 0–3000 Hz</span></div>
@@ -929,37 +929,137 @@
         .filter(d => !explicitKeys.has(averageEntryKey(d)));
       return [...explicit, ...legacy];
     }
+    function referencePointSort(a, b) {
+      return a.x - b.x || a.y - b.y;
+    }
+    function referenceCross(a, b, c) {
+      return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    }
+    function referenceConvexHull(points) {
+      const unique = [...new Map(points.map(point => [point.x.toFixed(4) + '|' + point.y.toFixed(4), point])).values()].sort(referencePointSort);
+      if (unique.length <= 2) return unique;
+      const lower = [];
+      unique.forEach(point => {
+        while (lower.length >= 2 && referenceCross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop();
+        lower.push(point);
+      });
+      const upper = [];
+      [...unique].reverse().forEach(point => {
+        while (upper.length >= 2 && referenceCross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop();
+        upper.push(point);
+      });
+      return lower.slice(0, -1).concat(upper.slice(0, -1));
+    }
+    function referenceEllipsePoints(cx, cy, rx, ry, angle, count = 20) {
+      return Array.from({ length: count }, (_, index) => {
+        const theta = (Math.PI * 2 * index) / count;
+        const cos = Math.cos(theta);
+        const sin = Math.sin(theta);
+        return { x: cx + cos * rx * Math.cos(angle) - sin * ry * Math.sin(angle), y: cy + cos * rx * Math.sin(angle) + sin * ry * Math.cos(angle) };
+      });
+    }
+    function referenceExpandHull(points, padding = 12) {
+      if (points.length === 0) return [];
+      if (points.length === 1) return referenceEllipsePoints(points[0].x, points[0].y, padding, padding, 0);
+      if (points.length === 2) {
+        const centerX = (points[0].x + points[1].x) / 2;
+        const centerY = (points[0].y + points[1].y) / 2;
+        const dx = points[1].x - points[0].x;
+        const dy = points[1].y - points[0].y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return referenceEllipsePoints(centerX, centerY, length / 2 + padding, padding, Math.atan2(dy, dx), 24);
+      }
+      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 });
+      return points.map(point => {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        return { x: point.x + dx / length * padding, y: point.y + dy / length * padding };
+      });
+    }
+    function referenceClosestPointOnSegment(px, py, a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSquared = dx * dx + dy * dy;
+      const t = lengthSquared ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lengthSquared)) : 0;
+      return { x: a.x + t * dx, y: a.y + t * dy };
+    }
+    function referenceClosestPointOnHull(px, py, points) {
+      if (!points.length) return null;
+      let closest = points[0];
+      let closestDistance = Infinity;
+      points.forEach((point, index) => {
+        const candidate = referenceClosestPointOnSegment(px, py, point, points[(index + 1) % points.length]);
+        const distance = (candidate.x - px) ** 2 + (candidate.y - py) ** 2;
+        if (distance < closestDistance) { closest = candidate; closestDistance = distance; }
+      });
+      return closest;
+    }
+    function referencePolygonPath(points) {
+      if (!points.length) return '';
+      return 'M ' + points.map(point => point.x + ' ' + point.y).join(' L ') + ' Z';
+    }
     function getReferenceZone(vowel, gender) {
-      const values = averageDisplayData()
+      const rawValues = data
+        .filter(item => !isLegacyAverageSpeaker(item) && item.vowel === vowel && item.gender === gender)
+        .map(item => ({ f1: Number(item.f1), f2: Number(item.f2) }))
+        .filter(item => Number.isFinite(item.f1) && Number.isFinite(item.f2));
+      const averageValues = averageDisplayData()
         .filter(item => item.vowel === vowel && item.gender === gender)
         .map(item => ({ f1: Number(item.f1), f2: Number(item.f2) }))
         .filter(item => Number.isFinite(item.f1) && Number.isFinite(item.f2));
+      const values = rawValues.length ? rawValues : averageValues;
       if (!values.length) return null;
-      const f1Values = values.map(item => item.f1);
-      const f2Values = values.map(item => item.f2);
-      const f1Min = Math.max(domain.f1Min, Math.min(...f1Values) - Math.max(55, (Math.max(...f1Values) - Math.min(...f1Values)) * .5));
-      const f1Max = Math.min(domain.f1Max, Math.max(...f1Values) + Math.max(55, (Math.max(...f1Values) - Math.min(...f1Values)) * .5));
-      const f2Min = Math.max(domain.f2Min, Math.min(...f2Values) - Math.max(100, (Math.max(...f2Values) - Math.min(...f2Values)) * .5));
-      const f2Max = Math.min(domain.f2Max, Math.max(...f2Values) + Math.max(100, (Math.max(...f2Values) - Math.min(...f2Values)) * .5));
-      return { gender, vowel, f1Min, f1Max, f2Min, f2Max, centerF1: f1Values.reduce((sum, value) => sum + value, 0) / f1Values.length, centerF2: f2Values.reduce((sum, value) => sum + value, 0) / f2Values.length };
+      const hull = referenceConvexHull(values.map(item => ({ x: xScale(item.f2), y: yScale(item.f1) })));
+      return { gender, vowel, source: rawValues.length ? 'shared' : 'average', valueCount: values.length, hull: referenceExpandHull(hull, rawValues.length ? 12 : 18) };
     }
-    function referenceZoneRect(zone) {
-      const x1 = xScale(zone.f2Max);
-      const x2 = xScale(zone.f2Min);
-      const y1 = yScale(zone.f1Min);
-      const y2 = yScale(zone.f1Max);
-      return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1), centerX: xScale(zone.centerF2), centerY: yScale(zone.centerF1) };
+    function syncReferenceZoneControls() {
+      const active = Boolean(micStream || micPoint);
+      const status = document.getElementById('referenceZoneStatus');
+      const relation = document.getElementById('micReferenceRelation');
+      const master = document.getElementById('referenceZoneToggle');
+      const male = document.getElementById('referenceZoneMaleToggle');
+      const female = document.getElementById('referenceZoneFemaleToggle');
+      if (master) master.checked = referenceZoneVisible;
+      if (male) male.checked = referenceZoneMaleVisible;
+      if (female) female.checked = referenceZoneFemaleVisible;
+      if (status) status.textContent = active ? '측정값 표시 중' : '마이크 대기';
+      if (relation) {
+        relation.textContent = !referenceZoneVisible
+          ? '관찰 범위 표시가 꺼져 있습니다.'
+          : active
+            ? '현재 선택 모음의 측정값과 해당 모음 관찰 범위의 위치 관계를 차트의 점선으로 표시합니다.'
+            : '마이크 측정값이 생기면 모음별 관찰 범위와 위치 관계를 차트에 표시합니다.';
+      }
     }
-    function closestPointOnRect(px, py, rect) {
-      const inside = px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
-      if (!inside) return { x: Math.max(rect.x, Math.min(rect.x + rect.width, px)), y: Math.max(rect.y, Math.min(rect.y + rect.height, py)) };
-      const candidates = [
-        { x: rect.x, y: py },
-        { x: rect.x + rect.width, y: py },
-        { x: px, y: rect.y },
-        { x: px, y: rect.y + rect.height }
-      ];
-      return candidates.sort((a, b) => ((a.x - px) ** 2 + (a.y - py) ** 2) - ((b.x - px) ** 2 + (b.y - py) ** 2))[0];
+    function drawReferenceZones() {
+      const layer = document.getElementById('referenceZoneLayer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      const selectedMicVowel = document.getElementById('micVowel')?.value;
+      if (!referenceZoneVisible || !(micStream || micPoint) || !selectedMicVowel) return;
+      const genders = [];
+      if (referenceZoneMaleVisible) genders.push('male');
+      if (referenceZoneFemaleVisible) genders.push('female');
+      const zones = VOWELS.flatMap(vowel => genders.map(gender => getReferenceZone(vowel, gender)).filter(Boolean));
+      if (!zones.length) return;
+      const micReady = micPoint && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)) && micPoint.vowel === selectedMicVowel;
+      const micX = micReady ? xScale(Number(micPoint.f2)) : null;
+      const micY = micReady ? yScale(Number(micPoint.f1)) : null;
+      const markup = zones.map(zone => {
+        const className = zone.gender === 'male' ? 'male-zone' : 'female-zone';
+        const label = zone.vowel + ' · ' + (zone.gender === 'male' ? '남성' : '여성');
+        const minX = Math.min(...zone.hull.map(point => point.x));
+        const minY = Math.min(...zone.hull.map(point => point.y));
+        const selected = zone.vowel === selectedMicVowel;
+        const lineTarget = micReady && selected ? referenceClosestPointOnHull(micX, micY, zone.hull) : null;
+        const line = lineTarget && (Math.abs(lineTarget.x - micX) > 1 || Math.abs(lineTarget.y - micY) > 1)
+          ? '<line class="reference-zone-distance ' + className + '" x1="' + micX + '" y1="' + micY + '" x2="' + lineTarget.x + '" y2="' + lineTarget.y + '" />'
+          : '';
+        const targetDot = lineTarget ? '<circle class="reference-zone-distance-dot ' + className + '" cx="' + lineTarget.x + '" cy="' + lineTarget.y + '" r="3" />' : '';
+        return '<path class="reference-zone ' + className + '" d="' + referencePolygonPath(zone.hull) + '" aria-label="' + label + ' 관찰 범위" />' + line + targetDot + '<text class="reference-zone-label ' + className + '" x="' + (minX + 8) + '" y="' + (minY + 16) + '">' + label + '</text>';
+      }).join('');
+      layer.innerHTML = markup;
     }
     function syncReferenceZoneControls() {
       const active = Boolean(micStream || micPoint);
