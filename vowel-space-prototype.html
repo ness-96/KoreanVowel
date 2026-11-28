@@ -1080,38 +1080,6 @@
             : '마이크 측정값이 생기면 관찰 범위와의 위치 관계를 차트에 표시합니다.';
       }
     }
-    function drawReferenceZones() {
-      const layer = document.getElementById('referenceZoneLayer');
-      if (!layer) return;
-      layer.innerHTML = '';
-      const vowel = document.getElementById('micVowel')?.value;
-      if (!referenceZoneVisible || !(micStream || micPoint) || !vowel) return;
-      const zones = [];
-      if (referenceZoneMaleVisible) {
-        const zone = getReferenceZone(vowel, 'male');
-        if (zone) zones.push(zone);
-      }
-      if (referenceZoneFemaleVisible) {
-        const zone = getReferenceZone(vowel, 'female');
-        if (zone) zones.push(zone);
-      }
-      if (!zones.length) return;
-      const micReady = micPoint && Number.isFinite(Number(micPoint.f1)) && Number.isFinite(Number(micPoint.f2)) && micPoint.vowel === vowel;
-      const micX = micReady ? xScale(Number(micPoint.f2)) : null;
-      const micY = micReady ? yScale(Number(micPoint.f1)) : null;
-      const markup = zones.map(zone => {
-        const rect = referenceZoneRect(zone);
-        const className = zone.gender === 'male' ? 'male-zone' : 'female-zone';
-        const label = zone.gender === 'male' ? '남성 관찰 범위' : '여성 관찰 범위';
-        const lineTarget = micReady ? closestPointOnRect(micX, micY, rect) : null;
-        const line = lineTarget && (Math.abs(lineTarget.x - micX) > 1 || Math.abs(lineTarget.y - micY) > 1)
-          ? '<line class="reference-zone-distance ' + className + '" x1="' + micX + '" y1="' + micY + '" x2="' + lineTarget.x + '" y2="' + lineTarget.y + '" />'
-          : '';
-        const targetDot = lineTarget ? '<circle class="reference-zone-distance-dot ' + className + '" cx="' + lineTarget.x + '" cy="' + lineTarget.y + '" r="3" />' : '';
-        return '<rect class="reference-zone ' + className + '" x="' + rect.x + '" y="' + rect.y + '" width="' + rect.width + '" height="' + rect.height + '" rx="14" aria-label="' + label + '" />' + line + targetDot + '<text class="reference-zone-label ' + className + '" x="' + (rect.x + 8) + '" y="' + (rect.y + 16) + '">' + label + '</text>';
-      }).join('');
-      layer.innerHTML = markup;
-    }
     function matchesSelectedAge(d) {
       if (selectedAge === 'all') return true;
       if (selectedAge === 'average') return d.age === '평균' || d.age === 'average' || isLegacyAverageSpeaker(d);
