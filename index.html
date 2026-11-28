@@ -955,19 +955,7 @@
       let maxY = Math.max(...points.map(point => point.y));
       if (maxX - minX < 1) { minX -= 12; maxX += 12; }
       if (maxY - minY < 1) { minY -= 12; maxY += 12; }
-      const radius = Math.min(14, (maxX - minX) / 2, (maxY - minY) / 2);
-      const boundary = [];
-      const addArc = (cx, cy, start, end) => {
-        for (let index = 0; index <= 6; index += 1) {
-          const theta = start + (end - start) * index / 6;
-          boundary.push({ x: cx + Math.cos(theta) * radius, y: cy + Math.sin(theta) * radius });
-        }
-      };
-      addArc(maxX - radius, minY + radius, -Math.PI / 2, 0);
-      addArc(maxX - radius, maxY - radius, 0, Math.PI / 2);
-      addArc(minX + radius, maxY - radius, Math.PI / 2, Math.PI);
-      addArc(minX + radius, minY + radius, Math.PI, Math.PI * 1.5);
-      return boundary;
+      return [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
     }
     function referenceClosestPointOnSegment(px, py, a, b) {
       const dx = b.x - a.x;
