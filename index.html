@@ -999,6 +999,40 @@
       if (!points.length) return '';
       return 'M ' + points.map(point => point.x + ' ' + point.y).join(' L ') + ' Z';
     }
+    function referenceEnclosingEllipse(points, padding = 12) {
+      if (!points.length) return [];
+      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 });
+      if (points.length === 1) return referenceEllipsePoints(center.x, center.y, padding, padding, 0, 48);
+      let covarianceXX = 0;
+      let covarianceXY = 0;
+      let covarianceYY = 0;
+      points.forEach(point => {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        covarianceXX += dx * dx;
+        covarianceXY += dx * dy;
+        covarianceYY += dy * dy;
+      });
+      const angle = .5 * Math.atan2(2 * covarianceXY, covarianceXX - covarianceYY);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      let radiusX = 0;
+      let radiusY = 0;
+      const projected = points.map(point => {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const along = dx * cos + dy * sin;
+        const across = -dx * sin + dy * cos;
+        radiusX = Math.max(radiusX, Math.abs(along));
+        radiusY = Math.max(radiusY, Math.abs(across));
+        return { along, across };
+      });
+      radiusX = Math.max(radiusX, 1);
+      radiusY = Math.max(radiusY, 1);
+      const maxRatio = Math.max(1, ...projected.map(point => (point.along / radiusX) ** 2 + (point.across / radiusY) ** 2));
+      const scale = Math.sqrt(maxRatio);
+      return referenceEllipsePoints(center.x, center.y, radiusX * scale + padding, radiusY * scale + padding, angle, 48);
+    }
     function getReferenceZone(vowel, gender) {
       const rawValues = data
         .filter(item => !isLegacyAverageSpeaker(item) && item.vowel === vowel && item.gender === gender)
@@ -1010,8 +1044,8 @@
         .filter(item => Number.isFinite(item.f1) && Number.isFinite(item.f2));
       const values = rawValues.length ? rawValues : averageValues;
       if (!values.length) return null;
-      const hull = referenceConvexHull(values.map(item => ({ x: xScale(item.f2), y: yScale(item.f1) })));
-      return { gender, vowel, source: rawValues.length ? 'shared' : 'average', valueCount: values.length, hull: referenceExpandHull(hull, rawValues.length ? 12 : 18) };
+      const pixelValues = values.map(item => ({ x: xScale(item.f2), y: yScale(item.f1) }));
+      return { gender, vowel, source: rawValues.length ? 'shared' : 'average', valueCount: values.length, hull: referenceEnclosingEllipse(pixelValues, rawValues.length ? 12 : 18) };
     }
     function syncReferenceZoneControls() {
       const active = Boolean(micStream || micPoint);
